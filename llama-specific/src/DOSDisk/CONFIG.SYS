@@ -1,0 +1,32 @@
+[menu]
+menuitem=SETUP_CD, Start Windows 98 Setup from USB CD-ROM.
+menuitem=CD, Start computer with USB CD-ROM support.
+menuitem=NOCD, Start computer without CD-ROM support.
+menuitem=LLAMA_SETUP, Start Computer with USB CD-ROM support to Install Llama-specific Windows 98 extensions
+menudefault=SETUP_CD,30
+menucolor=7,0
+
+[SETUP_CD]
+device=himem.sys /testmem:NUMHANDLES=128 /TESTMEM:OFF /Q
+DEVICE=a:\usbaspi1.sys /V /E
+DEVICE=a:\usbcd1.sys /D:usbcd001
+
+[CD]
+device=himem.sys /testmem:NUMHANDLES=128 /TESTMEM:OFF /Q
+DEVICE=a:\usbaspi1.sys /V /E
+DEVICE=a:\usbcd1.sys /D:usbcd001
+
+[LLAMA_SETUP]
+device=himem.sys /testmem:NUMHANDLES=128 /TESTMEM:OFF /Q
+DEVICE=a:\usbaspi1.sys /V /E
+DEVICE=a:\usbcd1.sys /D:usbcd001
+
+[NOCD]
+device=himem.sys /testmem:off
+
+[COMMON]
+files=60
+buffers=20
+dos=high,umb
+stacks=9,128
+lastdrive=Y
