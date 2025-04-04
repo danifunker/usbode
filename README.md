@@ -25,6 +25,17 @@ USBODE is a set of scripts that uses the Linux USB Gadget kernel modules to turn
 -   Connect to the Pi, either via HDMI + keyboard, SSH or Serial
 -   Create a folder for the USBODE `sudo mkdir -p /opt/usbode`
 -   Copy the `usbode.py` to the folder
+-   Copy the `scripts` folder and all of the contents into the same folder. Folder setup should loook like this:
+```
+/opt/usbode
+├── scripts
+│   ├── cd_gadget_setup.sh
+│   ├── cleanup_mode.sh
+│   ├── disablegadget.sh
+│   ├── enablegadget.sh
+│   └── exfat_gadget_setup.sh
+└── usbode.py
+```
 -   Install flask `sudo apt-get install python3-flask`
 -   Add the following file to (will need sudo access)`/lib/systemd/system/usbode.service`
 ```
