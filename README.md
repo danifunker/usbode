@@ -86,3 +86,8 @@ Maybe create a method to change the ISO through a DOS program or TSR (I have no 
 It is also possible to startup a second USB interface, possibly a COM port to be able to communicate with the app maybe.
 
 Feel free to contribue to the project.
+
+## Donations
+
+Support me on ko-fi!
+https://ko-fi.com/danifunker
