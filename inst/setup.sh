@@ -24,7 +24,7 @@ resize2fs -p $root_mount
 #Install USBODE and enable service
 mkdir -p /opt/usbode
 cp -R /boot/firmware/usbode/* /boot/firmware/opt/usbode
-cp usbode.service /lib/systemd/system
+cp /boot/firmware/usbode.service /lib/systemd/system
 systemctl daemon-reload
 systemctl enable usbode.service
 
