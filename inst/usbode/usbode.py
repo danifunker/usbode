@@ -108,9 +108,14 @@ def init_gadget(type):
     os.makedirs("functions/mass_storage.usb0", exist_ok=True)
     if type == "cdrom":
         subprocess.run(['sh', 'scripts/cd_gadget_setup.sh',gadgetCDFolder ], cwd="/opt/usbode")
-        with open(iso_mount_file, "r") as f:
-            iso_filename = f.readline().strip()
-        change_Loaded_Mount(f"{store_mnt}/{iso_filename}")
+        if os.path.exists(f"{store_mnt}/{iso_filename}"):
+            with open(iso_mount_file, "r") as f:
+                iso_filename = f.readline().strip()
+            change_Loaded_Mount(f"{store_mnt}/{iso_filename}")
+        else:
+            print(f"The requested file to load {iso_filename} does not exist, kicking into exFAT mode now.")
+            init_gadget("exfat")
+            return "Error"
     elif type == "exfat":
         subprocess.run(['sh', 'scripts/exfat_gadget_setup.sh', gadgetCDFolder], cwd="/opt/usbode")
     enable_gadget()
