@@ -13,7 +13,7 @@ try:
     from flask import Flask
 except:
     print("Flask module not found, attempting install...")
-    subprocess.run(['sh', 'apt', 'update'])
+    subprocess.run(['sh', 'apt', 'update', '-y'])
     subprocess.run(['sh', 'apt', 'install', '-y', 'python3-flask'])
     print("Flask attempted install, trying to restart to force reload.")
     quit(0)
