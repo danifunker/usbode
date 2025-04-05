@@ -12,7 +12,7 @@ USBODE is a set of scripts that uses the Linux USB Gadget kernel modules to turn
     -   Use the Pi Imager tool to preconfigure hostname, login and locale
     -   If configuring wifi, remember, Pi Zero W and Zero 2 W models only supports 2.4ghz networks up to Wireless-N standards
 2. Eject the SDCard from the computer when prompted, and re-insert the sdcard.
-3. Copy all the files from the `/inst` folder to the `bootfs` partition on the SDCard.
+3. Copy all the files from the `/inst` folder to the `bootfs` partition on the SDCard. Replace `config.txt` when prompted.
 4. Edit the file cmdline.txt, remove `init=` (all of the stuff after init before the space) and replace it with `init=/bin/bash`. Eject the SDCard rom the computer.
 
 5. **Start the Pi with Keyboard and Video connected**. Plug in a keyboard, video and the MicroSD card into the Pi (keyboard was tested using an OTG dongle). Remember to use the USB port closer to the HDMI port. Boot it up, when you see the `#` prompt, type in the following commands:
