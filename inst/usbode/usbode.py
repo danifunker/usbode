@@ -5,10 +5,18 @@ import time
 import subprocess
 import os
 from pathlib import Path
-from flask import Flask
 from threading import Thread
 import time
 import socket
+
+try: 
+    from flask import Flask
+except:
+    print("Flask module not found, attempting install...")
+    subprocess.run(['sh', 'apt', 'update'])
+    subprocess.run(['sh', 'apt', 'install', '-y', 'python3-flask'])
+    print("Flask attempted install, trying to restart to force reload.")
+    quit(0)
 
 def version():
     print("USBODE - Turn your Pi Zero/Zero 2 into one a virtual USB CD-ROM drive")
@@ -20,6 +28,7 @@ store_mnt = '/mnt/imgstore'
 allow_update_from_store = True
 gadgetCDFolder = '/sys/kernel/config/usb_gadget/usbode'
 iso_mount_file = '/opt/usbode/usbode-iso.txt'
+cdemu_cdrom = '/dev/cdrom'
 
 app = Flask(__name__)
 @app.route('/')
@@ -38,6 +47,10 @@ def listFiles():
     for file in fileList:
         response+=f"<a href='/mount/{file}'>{file}</a><br><br>"
     return f"Current File Loaded: {getMountedCDName()}<br><br>To load a different ISO, select it. Be aware the system will disconnect and reconnect the optical drive.<br><br> {response} <br> <a href='/'>Return to USBODE homepage</a>"
+@app.route('/cdemu')
+def mountCDEMU():
+    change_Loaded_Mount(f"{cdemu_cdrom}")
+    return f"Attempting to mount CDEMU CDROM (must already be mounted)...<br> <a href='/'>Return to USBODE homepage</a>"
 @app.route('/mount/<file>')
 def mountFile(file):
     change_Loaded_Mount(f"{store_mnt}/{file}")
@@ -97,7 +110,7 @@ def init_gadget(type):
         subprocess.run(['sh', 'scripts/cd_gadget_setup.sh',gadgetCDFolder ], cwd="/opt/usbode")
         with open(iso_mount_file, "r") as f:
             iso_filename = f.readline().strip()
-        change_Loaded_Mount(f"{iso_filename}")
+        change_Loaded_Mount(f"{store_mnt}/{iso_filename}")
     elif type == "exfat":
         subprocess.run(['sh', 'scripts/exfat_gadget_setup.sh', gadgetCDFolder], cwd="/opt/usbode")
     enable_gadget()
@@ -207,7 +220,10 @@ def main():
     subprocess.run(['modprobe', 'libcomposite'])
     daemon = Thread(target=start_flask, daemon=True, name='Server')
     daemon.start()
-    init_gadget("cdrom")
+    if os.path.exists(iso_mount_file):
+        init_gadget("cdrom")
+    else:
+        init_gadget("exfat")
     time.sleep(.5)  # Delay for previous version script to exit
     while True:
         cmd = input("usbode> ")
