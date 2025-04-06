@@ -1,6 +1,5 @@
 #!/bin/bash
 mount -t tmpfs tmp /run
-mkdir -p /run/systemd
 mount / -o remount,rw
 
 #exec 1> /boot/usbode-setup.log 2>&1
@@ -30,7 +29,7 @@ systemctl enable usbode.service
 
 #Continue with "normal" Pi installation including script
 sed -i 's| init=/bin/bash||' /boot/firmware/cmdline.txt
-source /usr/lib/raspberrypi-sys-mods/firstboot
+source /usr/lib/raspberrypi-sys-mods/firstbootpost
 
 #Add the following to cmdline.txt at the end
 # init=/bin/bash -c "mount -t proc proc /proc; mount -t sysfs sys /sys; mount /boot; source /boot/usbode-boot-setup.sh"
