@@ -8,17 +8,12 @@ USBODE is a set of scripts that uses the Linux USB Gadget kernel modules to turn
 
 ## New Install process (not yet completed)
 1. **Prepare the SD Card**
--   Using the Pi Imager tool, flash Raspberry Pi OS Lite (bookwork) 32-bit images to an SD Card (32 GB minimum recommended size)
+-   Using the Pi Imager tool, flash the included image (see releases). This is a customized version of Raspberry Pi OS Lite (bookwork) 32-bit image (original file `2024-11-19-raspios-bookworm-armhf-lite.img.xz`) to an SD Card (32 GB minimum recommended size) 
     -   Use the Pi Imager tool to preconfigure hostname, login and locale
     -   If configuring wifi, remember, Pi Zero W and Zero 2 W models only supports 2.4ghz networks up to Wireless-N standards
 2. Eject the SDCard from the computer when prompted, and re-insert the sdcard.
 3. Copy all the files from the `/inst` folder to the `bootfs` partition on the SDCard. Replace `config.txt` when prompted.
-4. Edit the file cmdline.txt, remove `init=/usr/lib/raspberrypi-sys-mods/firstboot` and replace it with `init=/bin/bash`. Eject the SDCard rom the computer.
-5. **Start the Pi with Keyboard and Video connected**. Plug in a keyboard, video and the MicroSD card into the Pi (keyboard was tested using an OTG dongle). Remember to use the USB port closer to the HDMI port. Boot it up, when you see the `#` prompt, type in the following commands:
-    * `mount /boot/firmware`
-    * `/boot/firmware/setup.sh`
-
-6. Wait for the auto configure and everything to start, give it a few minutes, once the pi reboots unplug the keyboard from the Pi (the keyboard is incomptaible with USB host mode).
+6. Wait for the auto configure and everything to start, give it a few minutes, once the pi reboots unplug the keyboard from the Pi (the keyboard is incomptaible with USB host mode). If the usbode page gives a 500 error, reboot the pi then try again.
 
 The above documention might be missing stuff, please be patient with me during this time.
 
