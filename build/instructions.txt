@@ -1,0 +1,23 @@
+## Scratch not instructions on building the image
+
+1) Download 2024-11-19-raspios-bookworm-armhf-lite.img.xz `https://downloads.raspberrypi.com/raspios_lite_armhf/images/raspios_lite_armhf-2024-11-19/`
+2) Dump the image onto a new SDcard
+3) Once setup is complete for the Pi Zero / Zero 2 W, copy the same image onto the device somewhere
+4) Clone this repo - https://github.com/cinderblock/RaspberryPi-Image-Edit, we will use chroot.sh
+5) chroot into the image
+6) apt update -y  && apt install -y python3-flask curl vim
+7) mv the file `/lib/raspberrypi-sys-mods/firstboot` to `/lib/raspberrypi-sys-mods/firstbootpost`
+8) Create a new file `/lib/raspberrypi-sys-mods/firstboot` with the contents of `firstboot` in this folder.
+9) Extract the initfs using the following instructions
+    * `mkdir -p /tmp/initfs`
+    * `cd /tmp/initfs`
+    * `cat /boot/initramfs7l | unzstd -- |cpio -idvm `
+    * edit the file `/tmp/initfs/scripts/local-premount/firstboot` and change line 56 from `do_resize` to `log_warning_msg "Resize skipped due to resizing in another section"`
+    * `cd /tmp/initfs`
+    * `find . -print0| sort -z | cpio --null -H newc --quiet -o > ../initramfs.img`
+    * `cd ..`
+    * `cat initramfs.img | zstd >> /boot/initramfs7l`
+    * repeat this for each of the initramfs files
+    * once all mondifications have been done to the image, use `CTRL + D` to exit the mode.
+10) Copy the file back to a computer
+11) use xz on the .img file to make a new one.

@@ -10,8 +10,7 @@ root_mount=$(findmnt -Ufnro SOURCE -M /)
 root_drive=$(lsblk -npro PKNAME "$root_mount")
 root_partition=${root_mount: -1}
 
-parted -a optimal $root_drive --script mkpart primary fat32 8092 100%
-parted $root_drive --script set 1 msftdata on
+parted -a optimal $root_drive --script mkpart primary 8092 100%
 chmod +x /boot/firmware/armv7l-mkfs.exfat
 /boot/firmware/armv7l-mkfs.exfat -L imgstore "${root_drive}p3"
 mkdir -p /mnt/imgstore

@@ -1,0 +1,39 @@
+#!/bin/bash
+
+reboot_pi () {
+  umount "$FWLOC"
+  mount / -o remount,ro
+  sync
+  reboot -f "$BOOT_PART_NUM"
+  sleep 5
+  exit 0
+}
+
+get_variables () {
+  ROOT_PART_DEV=$(findmnt / -no source)
+  ROOT_DEV_NAME=$(lsblk -no pkname  "$ROOT_PART_DEV")
+  ROOT_DEV="/dev/${ROOT_DEV_NAME}"
+
+  BOOT_PART_DEV=$(findmnt "$FWLOC" -no source)
+  BOOT_PART_NAME=$(lsblk -no kname "$BOOT_PART_DEV")
+  BOOT_DEV_NAME=$(lsblk -no pkname  "$BOOT_PART_DEV")
+  BOOT_PART_NUM=$(cat "/sys/block/${BOOT_DEV_NAME}/${BOOT_PART_NAME}/partition")
+
+  OLD_DISKID=$(fdisk -l "$ROOT_DEV" | sed -n 's/Disk identifier: 0x\([^ ]*\)/\1/p')
+}
+
+mountpoint -q /proc || mount -t proc proc /proc
+mountpoint -q /sys || mount -t sysfs sys /sys
+mountpoint -q /run || mount -t tmpfs tmp /run
+mkdir -p /run/systemd
+
+mount / -o remount,rw
+
+if ! FWLOC=$(/usr/lib/raspberrypi-sys-mods/get_fw_loc); then
+  whiptail --msgbox "Could not determine firmware partition" 20 60
+  poweroff -f
+fi
+
+mount "$FWLOC" -o rw
+
+source "${FWLOC}/setup.sh"
