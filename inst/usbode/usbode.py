@@ -8,20 +8,18 @@ from pathlib import Path
 from threading import Thread
 import time
 import socket
-
 try: 
     from flask import Flask
 except:
     print("Flask module not found, attempting install...")
-    subprocess.run(['sh', 'apt', 'update', '-y'])
-    subprocess.run(['sh', 'apt', 'install', '-y', 'python3-flask'])
+    subprocess.run(['sh', 'scripts/installflask.sh'], cwd="/opt/usbode")
     print("Flask attempted install, trying to restart to force reload.")
-    quit(0)
+    exit(1)
 
 def version():
     print("USBODE - Turn your Pi Zero/Zero 2 into one a virtual USB CD-ROM drive")
     print("Idea by RaduTek 2022: https://github.com/RaduTek/PiEmuCD\n")
-    print("Web Functionality and massive rewrite Danifunker: https://github.com/danifunker/PiEmuCD\n")
+    print("Web Functionality and massive rewrite Danifunker: https://github.com/danifunker/usbode\n")
 
 store_dev = '/dev/mmcblk0p3'
 store_mnt = '/mnt/imgstore'
@@ -33,7 +31,7 @@ cdemu_cdrom = '/dev/cdrom'
 app = Flask(__name__)
 @app.route('/')
 def index():
-    return f"Welcome to USBODE, the USB Optical Drive Emulator!<br> My IP address is {socket.gethostbyname((socket.gethostname() + '.local'))}. <br> I am currently running from {os.path.abspath(__file__)} .<br>To switch modes click here: <a href='/switch'>/switch</a> <br> Current Image mounted are: {getMountedCDName()}. <br> Current Mode is: {checkState()} <br> <a href='/list'>Load Another Image</a><br><br><br><br><a href='/shutdown'>Shutdown the pi</a>"
+    return f"Welcome to USBODE, the USB Optical Drive Emulator!<br> My IP address is {socket.gethostbyname((socket.gethostname() + '.local'))}. <br> I am currently running from {os.path.abspath(__file__)} .<br>To switch modes click here: <a href='/switch'>/switch</a> <br> Currently Serving: {getMountedCDName()}. <br> Current Mode is: {checkState()} <br> <a href='/list'>Load Another Image</a><br><br><br><br><a href='/shutdown'>Shutdown the pi</a>"
 @app.route('/switch')  
 def switch():
     switch()
@@ -46,7 +44,7 @@ def listFiles():
         response+="The USBODE cannot scan the files in ExFAT mode. <a href='/switch'>Switch Modes</a>, then go back to this page.<br><br>"
     for file in fileList:
         response+=f"<a href='/mount/{file}'>{file}</a><br><br>"
-    return f"Current File Loaded: {getMountedCDName()}<br><br>To load a different ISO, select it. Be aware the system will disconnect and reconnect the optical drive.<br><br> {response} <br> <a href='/'>Return to USBODE homepage</a>"
+    return f"Current File Loaded: {getMountedCDName()}<br><br>To load a different ISO, select it. No disconnection between the OS and the USBODE will occur.<br><br> {response} <br> <a href='/'>Return to USBODE homepage</a>"
 @app.route('/cdemu')
 def mountCDEMU():
     change_Loaded_Mount(f"{cdemu_cdrom}")
@@ -59,6 +57,10 @@ def mountFile(file):
 def shutdown():
     start_shutdown()
     return f"Shutting down the pi now"
+@app.route('/exit')
+def exit():
+    start_exit()
+    return f"Exiting the app now"
 @app.route('/setup')
 def setup():
     fileList=list_images()
@@ -99,7 +101,7 @@ def cleanupMode(gadgetFolder=gadgetCDFolder):
     time.sleep(1)
 
 def init_gadget(type):
-    print("Initializing USBODE CD-ROM gadget through configfs...")
+    print(f"Initializing USBODE {type} gadget through configfs...")
     cleanupMode()
     os.makedirs(gadgetCDFolder, exist_ok=True)
     os.chdir(gadgetCDFolder)
@@ -108,16 +110,16 @@ def init_gadget(type):
     os.makedirs("functions/mass_storage.usb0", exist_ok=True)
     if type == "cdrom":
         subprocess.run(['sh', 'scripts/cd_gadget_setup.sh',gadgetCDFolder ], cwd="/opt/usbode")
-        if os.path.exists(f"{store_mnt}/{iso_filename}"):
-            with open(iso_mount_file, "r") as f:
-                iso_filename = f.readline().strip()
+        with open(iso_mount_file, "r") as f:
+            iso_filename = f.readline().strip()
+        if iso_filename and os.path.exists(f"{store_mnt}/{iso_filename}"):
             change_Loaded_Mount(f"{store_mnt}/{iso_filename}")
         else:
             print(f"The requested file to load {iso_filename} does not exist, kicking into exFAT mode now.")
-            init_gadget("exfat")
-            return "Error"
+            disable_gadget()
     elif type == "exfat":
         subprocess.run(['sh', 'scripts/exfat_gadget_setup.sh', gadgetCDFolder], cwd="/opt/usbode")
+        change_Loaded_Mount(f"{store_dev}")
     enable_gadget()
 
 def enable_gadget():
