@@ -112,8 +112,8 @@ def init_gadget(type):
         subprocess.run(['sh', 'scripts/cd_gadget_setup.sh',gadgetCDFolder ], cwd="/opt/usbode")
         with open(iso_mount_file, "r") as f:
             iso_filename = f.readline().strip()
-        if iso_filename and os.path.exists(f"{store_mnt}/{iso_filename}"):
-            change_Loaded_Mount(f"{store_mnt}/{iso_filename}")
+        if iso_filename and os.path.exists(f"{iso_filename}"):
+            change_Loaded_Mount(f"{iso_filename}")
         else:
             print(f"The requested file to load {iso_filename} does not exist, kicking into exFAT mode now.")
             disable_gadget()
