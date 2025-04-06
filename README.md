@@ -15,62 +15,10 @@ USBODE is a set of scripts that uses the Linux USB Gadget kernel modules to turn
 3. Copy all the files from the `/inst` folder to the `bootfs` partition on the SDCard. Replace `config.txt` when prompted.
 6. Wait for the auto configure and everything to start, give it a few minutes, once the pi reboots unplug the keyboard from the Pi (the keyboard is incomptaible with USB host mode). If the usbode page gives a 500 error, reboot the pi then try again.
 
-The above documention might be missing stuff, please be patient with me during this time.
+## First Startup
+If no iso files are found on the sdcard, USBODE will automatically go into "USB Mass Storage" mode, allowing the user to populate the sdcard with ISO files. Once at least one ISO file is on the sdcard in the `imgstore` partition, access the USBODE interface through a web browser on another system, then load an ISO. Once the ISO is loaded, be sure to switch the mode, so it's in mode `1` CD-ROM mode. I am currently looking into some logic to make sure whenever an ISO is loaded, the device stays in CD-ROM mode.
 
-## Installation 
-
-1. **Prepare the SD Card**
-
--   Flash Raspberry Pi OS Lite (Bullseye) to an SD Card (16 GB minimum recommended size)
-    -   Use the Pi Imager tool to preconfigure hostname, login and locale
-    -   If configuring wifi, remember, Pi Zero W and Zero 2 W models only supports 2.4ghz networks up to Wireless-N standards
--   Use a partitioning tool to:
-    -   Extend system partition to 8-16 GiB* (This has been increased, as I am continuing to work on other features for this script and we might need some additional space)
-    -   Create new partition, exFAT for the rest of the SD card -> this partition is called the **image store**.
--   Edit files from boot partition
-    -   Add `dtoverlay=dwc2` to `config.txt`
-    -   From `cmdline.txt` remove `quiet` and `init=/usr/lib/raspberrypi-sys-mods/firstboot` to prevent the OS from resizing the root partition on first boot
-
-2. **Configure the Raspberry Pi**
-
--   Connect to the Pi, either via HDMI + keyboard, SSH or Serial
--   Create a folder for the USBODE `sudo mkdir -p /opt/usbode`
--   Copy the `usbode.py` to the folder
--   Copy the `scripts` folder and all of the contents into the same folder. Folder setup should loook like this:
-```
-/opt/usbode
-├── scripts
-│   ├── cd_gadget_setup.sh
-│   ├── cleanup_mode.sh
-│   ├── disablegadget.sh
-│   ├── enablegadget.sh
-│   └── exfat_gadget_setup.sh
-└── usbode.py
-```
--   Install flask `sudo apt-get install python3-flask`
--   Add the following file to (will need sudo access)`/lib/systemd/system/usbode.service`
-```
-[Unit]
-Description=USBODE
-After=multi-user.target
-Conflicts=getty@tty1.service
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/python3 /opt/usbode/usbode.py
-StandardInput=tty-force
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-```
--   Reload the systemd service `sudo systemctl daemon-reload`
--   Start the service  `sudo systemctl start usbode.service`
--   Enable the service to start automatically on boot `sudo systemctl enable usbode.service`
--   To check the status of the service type `sudo systemctl status usbode.service`
--   To stop the service type `sudo systemctl stop usbode.service`
--   If you need to debug everything entirely make sure the service is stopped, then navigate to `/opt/usbode` and execute the script with `sudo python3 usbode.py`. Once you are done debugging, type exit at the shell and that will gracefully close off the script.
-
+## Usage
 3. Main interface
 
 -  The USBODE interface will take about 30 seconds to startup, once configured.
