@@ -1,0 +1,30 @@
+Format: 1.8
+Date: Sat, 05 Apr 2014 12:00:00 +0100
+Source: cdemu-daemon
+Binary: cdemu-daemon cdemu-daemon-dbg
+Architecture: armhf
+Version: 3.2.7-1
+Distribution: debian
+Urgency: low
+Maintainer: Henrik Stokseth <hstokset@users.sourceforge.net>
+Changed-By: Henrik Stokseth <hstokset@users.sourceforge.net>
+Description:
+ cdemu-daemon - Main CDEmu daemon
+ cdemu-daemon-dbg - Main CDEmu daemon (debugging symbols)
+Closes: 705409
+Changes:
+ cdemu-daemon (3.2.7-1) debian; urgency=low
+ .
+   * Initial Release. Closes: #705409
+Checksums-Sha1:
+ 5e677deeb277b181b2e9a55f9ee00726ffc00570 171180 cdemu-daemon-dbg_3.2.7-1_armhf.deb
+ 44f3b901d88ce1f9a0010fe810e979e21398ee23 8264 cdemu-daemon_3.2.7-1_armhf.buildinfo
+ db8d54b54c7d2b5f58b4ef904f9ec1ecb051b7b7 57980 cdemu-daemon_3.2.7-1_armhf.deb
+Checksums-Sha256:
+ 7393cd8a6a619fe901af83b0aec71bc8782b5f563ea05f2e0e4bd4d1e0c758f9 171180 cdemu-daemon-dbg_3.2.7-1_armhf.deb
+ f8f8d801625a8cc8a36970a992af09f98a0de729ecdfff4b8552ae3065b1f9d4 8264 cdemu-daemon_3.2.7-1_armhf.buildinfo
+ 0650f57291ac647551b679ba6d7a86a63ffb96b811c29f2fcc9fe95f15ef5b8b 57980 cdemu-daemon_3.2.7-1_armhf.deb
+Files:
+ 442f3c876377acee0708512ddb3134a8 171180 debug optional cdemu-daemon-dbg_3.2.7-1_armhf.deb
+ 249e8a0bbb21eb7e0a80fc6267bc81ee 8264 misc optional cdemu-daemon_3.2.7-1_armhf.buildinfo
+ 35530e560b5b82c80630205a2b26f927 57980 misc optional cdemu-daemon_3.2.7-1_armhf.deb
