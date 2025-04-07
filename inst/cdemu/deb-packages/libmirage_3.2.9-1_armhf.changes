@@ -1,0 +1,42 @@
+Format: 1.8
+Date: Sat, 05 Apr 2014 12:00:00 +0100
+Source: libmirage
+Binary: gir1.2-mirage-3.2 libmirage11 libmirage11-dbg libmirage11-dev libmirage11-doc
+Architecture: armhf all
+Version: 3.2.9-1
+Distribution: debian
+Urgency: low
+Maintainer: Henrik Stokseth <hstokset@users.sourceforge.net>
+Changed-By: Henrik Stokseth <hstokset@users.sourceforge.net>
+Description:
+ gir1.2-mirage-3.2 - CD-ROM image access library (typelib files)
+ libmirage11 - CD-ROM image access library
+ libmirage11-dbg - CD-ROM image access library (debugging symbols)
+ libmirage11-dev - CD-ROM image access library (development files)
+ libmirage11-doc - CD-ROM image access library (documentation)
+Closes: 705409
+Changes:
+ libmirage (3.2.9-1) debian; urgency=low
+ .
+   * Initial Release. Closes: #705409
+Checksums-Sha1:
+ 34b0b3f97234e4dfa8991d000c0d323daa415cf0 13308 gir1.2-mirage-3.2_3.2.9-1_armhf.deb
+ b9270f115457e5e17759630bd2aa902518de85e3 716256 libmirage11-dbg_3.2.9-1_armhf.deb
+ 202759f4be8681edab6b192a0b82c0ce79fdc718 57144 libmirage11-dev_3.2.9-1_armhf.deb
+ c6c9120f11d3cb75b107efd282dd48ddda1c7bc0 72184 libmirage11-doc_3.2.9-1_all.deb
+ d4f5aad7d6cb8673fb901933628db20b987e2ad8 189520 libmirage11_3.2.9-1_armhf.deb
+ d5a6d016c5571720922f81c5bb952524ae1d33d5 10143 libmirage_3.2.9-1_armhf.buildinfo
+Checksums-Sha256:
+ a14cdec94b9062324d27cb0439b4a52f16e296403c8840c138840485d651e9ee 13308 gir1.2-mirage-3.2_3.2.9-1_armhf.deb
+ ba82d4f8c635780537a61dedbffe8b72ea15579a179d74e6a00e806a99ce726d 716256 libmirage11-dbg_3.2.9-1_armhf.deb
+ 587c9ac6cde66abea9cb11ae705d3d0e75aaf6f30cce5316bf88fcc42bbd15d9 57144 libmirage11-dev_3.2.9-1_armhf.deb
+ 1ddef5680b1d2dcd26995742e7746067bb61eb3069a2f3a36230935db1944d28 72184 libmirage11-doc_3.2.9-1_all.deb
+ 69a42d261ad0687eb4d3ccd4600f1d1155f1dbcce14cc05cf41ab1301418a380 189520 libmirage11_3.2.9-1_armhf.deb
+ 371a8c2c296d8abb122a59a25babd27b6861ce42c645cb6c5bdcd6d9e574f0c1 10143 libmirage_3.2.9-1_armhf.buildinfo
+Files:
+ fd2d76818c318169626a17be0be9f21e 13308 introspection optional gir1.2-mirage-3.2_3.2.9-1_armhf.deb
+ af3b08fa72eac2bf2ffaa235de82d089 716256 debug optional libmirage11-dbg_3.2.9-1_armhf.deb
+ 2736b671d20faa113b9a3ea6de7c60f2 57144 libdevel optional libmirage11-dev_3.2.9-1_armhf.deb
+ d5c62535a8de34d4b93025dc3697c80f 72184 doc optional libmirage11-doc_3.2.9-1_all.deb
+ 02e636c24de215f3eb3a025f2b75f01b 189520 libs optional libmirage11_3.2.9-1_armhf.deb
+ 2e868e790f1c857ea1c69ded4c2cce3a 10143 libs optional libmirage_3.2.9-1_armhf.buildinfo

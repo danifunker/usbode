@@ -1,0 +1,9 @@
+[Unit]
+Description=CDEmu daemon
+Requires=dbus.service pulseaudio.service
+After=multi-user.target
+
+[Service]
+ExecStart=/usr/local/bin/cdemu-daemon --ctl-device=/dev/vhba_ctl --config-file "/opt/cdemu-daemon/daemon.conf" --bus system
+Restart=on-failure
+User=root

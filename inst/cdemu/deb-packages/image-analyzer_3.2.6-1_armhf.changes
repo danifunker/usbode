@@ -1,0 +1,26 @@
+Format: 1.8
+Date: Sat, 05 Apr 2014 12:00:00 +0100
+Source: image-analyzer
+Binary: image-analyzer
+Architecture: all
+Version: 3.2.6-1
+Distribution: debian
+Urgency: low
+Maintainer: Henrik Stokseth <hstokset@users.sourceforge.net>
+Changed-By: Henrik Stokseth <hstokset@users.sourceforge.net>
+Description:
+ image-analyzer - Mirage Image Analyzer
+Closes: 705409
+Changes:
+ image-analyzer (3.2.6-1) debian; urgency=low
+ .
+   * Initial Release. Closes: #705409
+Checksums-Sha1:
+ 5ae433b63fa1536effbd863bb172270c6b9e76b9 27600 image-analyzer_3.2.6-1_all.deb
+ 20bbe37382dc30b0edbfa47fac1af59935e14145 7095 image-analyzer_3.2.6-1_armhf.buildinfo
+Checksums-Sha256:
+ 15ca6d693a4e387a4e997df8c9d34ad47211ff5f6109ca73fb2bfb2b5d634275 27600 image-analyzer_3.2.6-1_all.deb
+ 936c87103d62f7d437192df4cf756b8fb2e2a670855f521e4cea6898f66d54fc 7095 image-analyzer_3.2.6-1_armhf.buildinfo
+Files:
+ fe9700247d7887f643de68dcf00e706c 27600 utils optional image-analyzer_3.2.6-1_all.deb
+ 09fd78af8bc710c5d2f8227832ec06c8 7095 utils optional image-analyzer_3.2.6-1_armhf.buildinfo

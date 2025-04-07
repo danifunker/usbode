@@ -1,0 +1,26 @@
+Format: 1.8
+Date: Sat, 05 Apr 2014 12:00:00 +0100
+Source: vhba-module
+Binary: vhba-dkms
+Architecture: all
+Version: 20240917-1
+Distribution: debian
+Urgency: low
+Maintainer: Henrik Stokseth <hstokset@users.sourceforge.net>
+Changed-By: Henrik Stokseth <hstokset@users.sourceforge.net>
+Description:
+ vhba-dkms  - VHBA virtual host bus adapter module
+Closes: 705409
+Changes:
+ vhba-module (20240917-1) debian; urgency=low
+ .
+   * Initial Release. Closes: #705409
+Checksums-Sha1:
+ 5709dbb782a6756055d5b864c2ceb59eb53ae8a1 10496 vhba-dkms_20240917-1_all.deb
+ b2a1425757bc9d3cbb8612bd4ca6d7784be180cb 5096 vhba-module_20240917-1_armhf.buildinfo
+Checksums-Sha256:
+ 791d116f161d261e68badf255d7110c17a7fe2111880ee76968c6442ba1ca392 10496 vhba-dkms_20240917-1_all.deb
+ b5a18968094da77afb73b8176c2b5fcf002999aef1e7964a1cbacd1731739db7 5096 vhba-module_20240917-1_armhf.buildinfo
+Files:
+ d9185c73e8a8dd680e604ff5a6d3ba1e 10496 misc optional vhba-dkms_20240917-1_all.deb
+ 76eaafcc072029d4b25db17c25c04342 5096 misc optional vhba-module_20240917-1_armhf.buildinfo
