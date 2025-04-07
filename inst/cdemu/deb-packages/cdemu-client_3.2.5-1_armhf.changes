@@ -1,0 +1,26 @@
+Format: 1.8
+Date: Sat, 05 Apr 2014 12:00:00 +0100
+Source: cdemu-client
+Binary: cdemu-client
+Architecture: all
+Version: 3.2.5-1
+Distribution: debian
+Urgency: low
+Maintainer: Henrik Stokseth <hstokset@users.sourceforge.net>
+Changed-By: Henrik Stokseth <hstokset@users.sourceforge.net>
+Description:
+ cdemu-client - Command-line client to control CDEmu daemon
+Closes: 705409
+Changes:
+ cdemu-client (3.2.5-1) debian; urgency=low
+ .
+   * Initial Release. Closes: #705409
+Checksums-Sha1:
+ 6d971a70ad55b3a12d58c578963136415cdce2fc 33620 cdemu-client_3.2.5-1_all.deb
+ 20a5217ff39693ccee95679d13204ea89b194298 7215 cdemu-client_3.2.5-1_armhf.buildinfo
+Checksums-Sha256:
+ 0b747a36121e7d8afca0753437a7ccd50ca3ddb6970242573f1f03426e01695f 33620 cdemu-client_3.2.5-1_all.deb
+ 5c1ad1595ccf51992917d2b62491891d0259c62cf46fb232ad17b574d2bd2b66 7215 cdemu-client_3.2.5-1_armhf.buildinfo
+Files:
+ 7f4f8abbb6833d152a290c1182af95a4 33620 utils optional cdemu-client_3.2.5-1_all.deb
+ 09bc7a0ea60ded6453ce311459a26cd3 7215 utils optional cdemu-client_3.2.5-1_armhf.buildinfo
