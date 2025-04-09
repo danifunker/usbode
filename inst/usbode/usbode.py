@@ -27,11 +27,17 @@ allow_update_from_store = True
 gadgetCDFolder = '/sys/kernel/config/usb_gadget/usbode'
 iso_mount_file = '/opt/usbode/usbode-iso.txt'
 cdemu_cdrom = '/dev/cdrom'
+global myIPaddress
+
+try:
+    myIPaddress = socket.gethostbyname(socket.gethostname() + '.local')
+except:
+    myIPaddress = "Unable to determine IP address. Reboot the Pi, and this issue should be resolved."
 
 app = Flask(__name__)
 @app.route('/')
 def index():
-    return f"Welcome to USBODE, the USB Optical Drive Emulator!<br> My IP address is {socket.gethostbyname((socket.gethostname() + '.local'))}. <br> I am currently running from {os.path.abspath(__file__)} .<br>To switch modes click here: <a href='/switch'>/switch</a> <br> Currently Serving: {getMountedCDName()}. <br> Current Mode is: {checkState()} <br> <a href='/list'>Load Another Image</a><br><br><br><br><a href='/shutdown'>Shutdown the pi</a>"
+    return f"Welcome to USBODE, the USB Optical Drive Emulator!<br> My IP address is {myIPaddress}. <br> I am currently running from {os.path.abspath(__file__)} .<br>To switch modes click here: <a href='/switch'>/switch</a> <br> Currently Serving: {getMountedCDName()}. <br> Current Mode is: {checkState()} <br> <a href='/list'>Load Another Image</a><br><br><br><br><a href='/shutdown'>Shutdown the pi</a>"
 @app.route('/switch')  
 def switch():
     switch()
