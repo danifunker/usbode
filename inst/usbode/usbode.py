@@ -18,17 +18,19 @@ except:
     print("Flask attempted install, trying to restart to force reload.")
     exit(1)
 
-def version():
-    print("USBODE - Turn your Pi Zero/Zero 2 into one a virtual USB CD-ROM drive")
-    print("Idea by RaduTek 2022: https://github.com/RaduTek/PiEmuCD\n")
-    print("Web Functionality and massive rewrite Danifunker: https://github.com/danifunker/usbode\n")
-
 store_dev = '/dev/mmcblk0p3'
 store_mnt = '/mnt/imgstore'
 allow_update_from_store = True
 gadgetCDFolder = '/sys/kernel/config/usb_gadget/usbode'
 iso_mount_file = '/opt/usbode/usbode-iso.txt'
 cdemu_cdrom = '/dev/cdrom'
+versionNum = "1.6"
+
+def version():
+    print("USBODE - Turn your Pi Zero/Zero 2 into one a virtual USB CD-ROM drive")
+    print("Web Functionality and massive rewrite Danifunker: https://github.com/danifunker/usbode\n")
+    print("USBODE version ${versionNum}")
+
 global myIPaddress
 
 try:
@@ -39,7 +41,7 @@ except:
 app = Flask(__name__)
 @app.route('/')
 def index():
-    return f"Welcome to USBODE, the USB Optical Drive Emulator!<br> My IP address is {myIPaddress}. <br> I am currently running from {os.path.abspath(__file__)} .<br>To switch modes click here: <a href='/switch'>/switch</a> <br> Currently Serving: {getMountedCDName()}. <br> Current Mode is: {checkState()} <br> <a href='/list'>Load Another Image</a><br><br><br><br><a href='/shutdown'>Shutdown the pi</a>"
+    return f"Welcome to USBODE, the USB Optical Drive Emulator!<br> My IP address is {myIPaddress}. <br> I am currently running from {os.path.abspath(__file__)} .<br>To switch modes click here: <a href='/switch'>/switch</a> <br> Currently Serving: {getMountedCDName()}. <br> Current Mode is: {checkState()} <br> <a href='/list'>Load Another Image</a><br><br>Version Number {versionNum}<br><br><a href='/shutdown'>Shutdown the pi</a>"
 @app.route('/switch')  
 def switch():
     switch()
