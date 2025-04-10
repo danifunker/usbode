@@ -8,6 +8,8 @@ from pathlib import Path
 from threading import Thread
 import time
 import socket
+import urllib.parse
+
 try: 
     from flask import Flask
 except:
@@ -49,7 +51,7 @@ def listFiles():
     if {checkState() == 2}:
         response+="The USBODE cannot scan the files in ExFAT mode. <a href='/switch'>Switch Modes</a>, then go back to this page.<br><br>"
     for file in fileList:
-        response+=f"<a href='/mount/{file}'>{file}</a><br><br>"
+        response+=f"<a href='/mount/{urllib.parse.quote_plus(file)}'>{file}</a><br><br>"
     return f"Current File Loaded: {getMountedCDName()}<br><br>To load a different ISO, select it. No disconnection between the OS and the USBODE will occur.<br><br> {response} <br> <a href='/'>Return to USBODE homepage</a>"
 @app.route('/cdemu')
 def mountCDEMU():
@@ -57,7 +59,7 @@ def mountCDEMU():
     return f"Attempting to mount CDEMU CDROM (must already be mounted)...<br> <a href='/'>Return to USBODE homepage</a>"
 @app.route('/mount/<file>')
 def mountFile(file):
-    change_Loaded_Mount(f"{store_mnt}/{file}")
+    change_Loaded_Mount(f"{store_mnt}/{urllib.parse.unquote_plus(file)}")
     return f"Attempting to mount {file}...<br> <a href='/'>Return to USBODE homepage</a>"
 @app.route('/shutdown')
 def shutdown():
