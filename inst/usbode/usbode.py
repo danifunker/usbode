@@ -182,11 +182,13 @@ def checkState(gadgetFolder=gadgetCDFolder):
                 return 0
 
 def change_Loaded_Mount(filename):
+    isoloading = False
     #Save the ISO filename to to persistent storage
     if filename.endswith(".iso"): 
         f = open(iso_mount_file, "w")
         f.write(f"{filename}" + "\n")
         f.close()
+        isoloading = True
     #Change the disk image in the gadget
     if not os.path.exists(gadgetCDFolder+"/functions/mass_storage.usb0/lun.0/file"):
         print("Gadget is not enabled, cannot change mount")
@@ -197,6 +199,8 @@ def change_Loaded_Mount(filename):
             print(f"Changing mount to {filename}")
             f.write(f"{filename}")
             f.close()
+            if checkState() == 2 and isoloading == True:
+                switch()
         return True
 
 # Help information
