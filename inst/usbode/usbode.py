@@ -143,6 +143,7 @@ def init_gadget(type):
         change_Loaded_Mount(f"{store_dev}")
     enable_gadget()
 
+
 def enable_gadget():
     p = subprocess.run(['sh', 'scripts/enablegadget.sh', gadgetCDFolder], cwd="/opt/usbode")
     if p.returncode != 0:
@@ -207,6 +208,7 @@ def change_Loaded_Mount(filename):
     #Change the disk image in the gadget
     if not os.path.exists(gadgetCDFolder+"/functions/mass_storage.usb0/lun.0/file"):
         print("Gadget is not enabled, cannot change mount")
+        updateDisplay(disp)
         return False
     else:
         print(gadgetCDFolder+"/functions/mass_storage.usb0/lun.0/file")
@@ -216,6 +218,7 @@ def change_Loaded_Mount(filename):
             f.close()
             if checkState() == 2 and isoloading == True:
                 switch()
+        updateDisplay(disp)
         return True
 
 # Help information
@@ -245,58 +248,6 @@ def start_shutdown():
 def start_flask():
     print("Starting Flask server...")
     app.run(host='0.0.0.0', port=80)
-
-def main():
-    #Setup Environment
-    print("Starting USBODE...")
-    print(f"Mounting image store on {store_mnt}...")
-    subprocess.run(['mount', store_dev, store_mnt, '-o', 'umask=000'])
-    subprocess.run(['modprobe', 'libcomposite'])
-    daemon = Thread(target=start_flask, daemon=True, name='Server')
-    daemon.start()
-    if os.path.exists(iso_mount_file):
-        init_gadget("cdrom")
-    else:
-        init_gadget("exfat")
-    time.sleep(.5)  # Delay for previous version script to exit
-    global oledEnabled
-    oledEnabled = True
-    while True:
-        if oledEnabled:
-            print("OLED Display Enabled")
-            #Init 1.3" display
-            print("done displaying output")
-            oledDaemon = Thread(target=getOLEDinput, daemon=True, name='OLED')
-            oledDaemon.start()
-        cmd = input("usbode> ")
-        cmd = cmd.strip(' ')
-        cmd_args = cmd.split(' ')
-        cmd = cmd_args[0]
-        if cmd == 'help':
-            for help_cmd in help_cmds:
-                if len(help_cmd) == 0:
-                    continue
-                else:
-                    print(f"{help_cmd[0]}", end='')
-                    if len(help_cmd) == 2:
-                        indent = '\t\t' if (len(help_cmd[0]) < 8) else '\t'
-                        print(f"{indent}{help_cmd[1]}")
-                    if len(help_cmd) > 2:
-                        for i in range(2,len(help_cmd)):
-                            print(f"\t\t{help_cmd[i]}")
-        elif cmd == 'version':
-            version()
-        elif cmd == 'exit':
-            start_exit()
-            quit(0)
-        elif cmd == 'shutdown':
-            start_exit()
-            start_shutdown()
-        elif cmd == 'switch':
-            switch()
-        else:
-            if cmd.strip(' ') != '':
-                print(f"Invalid command: {cmd}")            
 
 
 def changeISO_OLED(disp):
@@ -420,6 +371,58 @@ def getOLEDinput():
 def stopPiOled(disp):
     print("Stopping OLED")
     disp.RPI.module_exit()
+
+def main():
+    #Setup Environment
+    print("Starting USBODE...")
+    print(f"Mounting image store on {store_mnt}...")
+    subprocess.run(['mount', store_dev, store_mnt, '-o', 'umask=000'])
+    subprocess.run(['modprobe', 'libcomposite'])
+    daemon = Thread(target=start_flask, daemon=True, name='Server')
+    daemon.start()
+    if os.path.exists(iso_mount_file):
+        init_gadget("cdrom")
+    else:
+        init_gadget("exfat")
+    time.sleep(.5)  # Delay for previous version script to exit
+    global oledEnabled
+    oledEnabled = True
+    while True:
+        if oledEnabled:
+            print("OLED Display Enabled")
+            #Init 1.3" display
+            print("done displaying output")
+            oledDaemon = Thread(target=getOLEDinput, daemon=True, name='OLED')
+            oledDaemon.start()
+        cmd = input("usbode> ")
+        cmd = cmd.strip(' ')
+        cmd_args = cmd.split(' ')
+        cmd = cmd_args[0]
+        if cmd == 'help':
+            for help_cmd in help_cmds:
+                if len(help_cmd) == 0:
+                    continue
+                else:
+                    print(f"{help_cmd[0]}", end='')
+                    if len(help_cmd) == 2:
+                        indent = '\t\t' if (len(help_cmd[0]) < 8) else '\t'
+                        print(f"{indent}{help_cmd[1]}")
+                    if len(help_cmd) > 2:
+                        for i in range(2,len(help_cmd)):
+                            print(f"\t\t{help_cmd[i]}")
+        elif cmd == 'version':
+            version()
+        elif cmd == 'exit':
+            start_exit()
+            quit(0)
+        elif cmd == 'shutdown':
+            start_exit()
+            start_shutdown()
+        elif cmd == 'switch':
+            switch()
+        else:
+            if cmd.strip(' ') != '':
+                print(f"Invalid command: {cmd}")            
 
 if __name__ == "__main__":
     main()

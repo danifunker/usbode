@@ -1,6 +1,5 @@
 import config
 import time
-import numpy as np
 
 Device_SPI = config.Device_SPI
 Device_I2C = config.Device_I2C
