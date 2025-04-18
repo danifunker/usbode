@@ -29,7 +29,7 @@ allow_update_from_store = True
 gadgetCDFolder = '/sys/kernel/config/usb_gadget/usbode'
 iso_mount_file = '/opt/usbode/usbode-iso.txt'
 cdemu_cdrom = '/dev/cdrom'
-versionNum = "1.6"
+versionNum = "1.7"
 
 global fontM
 global fontS
@@ -299,65 +299,51 @@ def main():
                 print(f"Invalid command: {cmd}")            
 
 
-
-
-# Create blank image for drawing.
-# Make sure to create image with mode '1' for 1-bit color.
-
-# Get drawing object to draw on image.
-
-# UP = Button(6)
-
-# print("The button was pressed!",UP.value)
-
-def showISOs_OLED(iterator):
-    image1 = Image.new('1', (disp.width, disp.height), "WHITE")
-    draw = ImageDraw.Draw(image1)
-    draw.line([(0,24),(127,24)], fill = 0)
-
 def changeISO_OLED(disp):
     file_list=list_images()
     iterator = 0
     updateDisplay_FileS(disp, iterator, file_list)
     while True:
         time.sleep(0.1)
-        # with canvas(device) as draw:
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_UP_PIN ) == 0: # button is released
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_UP_PIN ) == 0:
             pass
-        else: # button is pressed:
+        else:
             iterator = iterator - 1
             if iterator < 0:
-                iterator = 0
-            updateDisplay_FileS(disp, iterator, file_list)
-            print("Going up")
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_LEFT_PIN) == 0: # button is released
-            pass
-        else: # button is pressed:
-            print("left")
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_RIGHT_PIN) == 0: # button is released
-            pass
-        else: # button is pressed:
-            print("right")
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_DOWN_PIN) == 0: # button is released
-            pass
-        else: # button is pressed:
-            iterator = iterator + 1
-            if iterator > len(file_list)-1:
                 iterator = len(file_list)-1
             updateDisplay_FileS(disp, iterator, file_list)
+            print("Going up")
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_LEFT_PIN) == 0:
+            pass
+        else:
+            print("left")
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_RIGHT_PIN) == 0:
+            pass
+        else:
+            print("right")
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_DOWN_PIN) == 0:
+            pass
+        else: 
+            iterator = iterator + 1
+            if iterator > len(file_list)-1:
+                iterator = 0
+            updateDisplay_FileS(disp, iterator, file_list)
             print (f"Selected {file_list[iterator]}")
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_PRESS_PIN) == 0: # button is released
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY1_PIN) == 0: # button is released
             pass
         else: # button is pressed:
-            #draw.rectangle((20, 22,40,40), outline=255, fill=1) #center filled
             print(f"loading {store_mnt}/{file_list[iterator]}")
             requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
-            #change_Loaded_Mount(f"{store_mnt}/{file_list[iterator]}")
             return True
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0: # button is released
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_PRESS_PIN) == 0: 
             pass
-        else: # button is pressed:
-            # draw.ellipse((100,20,120,40), outline=255, fill=1) #B button filled
+        else:
+            print(f"loading {store_mnt}/{file_list[iterator]}")
+            requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
+            return True
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0:
+            pass
+        else: 
             print("CANCEL") 
             return True
 
@@ -379,6 +365,29 @@ def updateDisplay(disp):
     draw.text((0, 36), "Mode: " + str(checkState()), font = fontL, fill = 0 )
     disp.ShowImage(disp.getbuffer(image1))
 
+def updateDisplay_Advanced(disp):
+    image1 = Image.new('1', (disp.width, disp.height), "WHITE")
+    draw = ImageDraw.Draw(image1)
+    draw.text((0, 0), "Advanced Menu:" + versionNum, font = fontL, fill = 0 )
+    draw.text((1,25), "Shutdown USBODE", font = fontS, fill = 0 )
+    draw.line([(0,37),(127,37)], fill = 0)
+    disp.ShowImage(disp.getbuffer(image1))
+    while True:
+        time.sleep(0.1)
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0:
+            pass
+        else: 
+            print("CANCEL") 
+            return True
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY1_PIN) == 0: # button is released
+            pass
+        else: # button is pressed:
+            requests.request('GET', f'http://127.0.0.1/shutdown')
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_PRESS_PIN) == 0: 
+            pass
+        else:
+            requests.request('GET', f'http://127.0.0.1/shutdown')
+       
 def getOLEDinput():
     global disp
     disp = SH1106.SH1106()
@@ -386,11 +395,18 @@ def getOLEDinput():
     disp.clear()
     updateDisplay(disp)
     while True:
+        time.sleep(0.1)
         if disp.RPI.digital_read(disp.RPI.GPIO_KEY3_PIN) == 0: # button is released
             pass
         else: # button is pressed:
             print("Changing MODE")
             switch()
+            updateDisplay(disp)
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0: # button is released
+            pass
+        else: # button is pressed:
+            print("ADVANCED MENU")
+            updateDisplay_Advanced(disp)
             updateDisplay(disp)
         if disp.RPI.digital_read(disp.RPI.GPIO_KEY1_PIN) == 0: # button is released
             pass
