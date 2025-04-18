@@ -5,11 +5,13 @@
 # Uncomment some or all of these to enable the optional hardware interfaces
 #dtparam=i2c_arm=on
 #dtparam=i2s=on
-#dtparam=spi=on
+dtparam=spi=on
 
 # Enable audio (loads snd_bcm2835)
-dtparam=audio=on
+#dtparam=audio=on
 dtoverlay=dwc2
+
+dtoverlay=rpi-codeczero
 
 # Additional overlays and parameters are documented
 # /boot/firmware/overlays/README
@@ -24,7 +26,7 @@ display_auto_detect=1
 auto_initramfs=1
 
 # Enable DRM VC4 V3D driver
-dtoverlay=vc4-kms-v3d
+dtoverlay=vc4-kms-v3d,noaudio
 max_framebuffers=2
 
 # Don't have the firmware create an initial video= setting in cmdline.txt.

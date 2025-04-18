@@ -21,3 +21,10 @@
     * once all mondifications have been done to the image, use `CTRL + D` to exit the mode.
 10) Copy the file back to a computer
 11) use xz on the .img file to make a new one.
+
+Also did the following things on 04/18/2025:
+
+apt-mark hold linux-image-rpi-v8 linux-image-rpi-v7l linux-image-rpi-v7 linux-image-rpi-v6 linux-headers-rpi-v7l linux-headers-rpi-v7 linux-headers-rpi-v6 initramfs-tools initramfs-tools-core
+
+also installed the following packages:
+cdemu cdplay cmus python3-smbus python3-spidev python3-pil python3-pip alsa-base 7zip git
