@@ -406,6 +406,8 @@ def main():
     print(f"Mounting image store on {store_mnt}...")
     subprocess.run(['mount', store_dev, store_mnt, '-o', 'umask=000'])
     subprocess.run(['modprobe', 'libcomposite'])
+    subprocess.run(['sh', 'scripts/alsa-settings-iqaudio.sh'], cwd="/opt/usbode")
+
     daemon = Thread(target=start_flask, daemon=True, name='Server')
     daemon.start()
     if os.path.exists(iso_mount_file):
