@@ -1,9 +1,14 @@
  #!/usr/bin/env python3
-
-import gpiozero
+import sys
+import os
+ScriptPath=os.path.dirname(__file__)
+sys.path.append(f"{ScriptPath}/waveshare")
+import SH1106
 import time
 import subprocess
-import os
+from PIL import Image, ImageDraw, ImageFont
+import requests
+from gpiozero import *
 from pathlib import Path
 from threading import Thread
 import time
@@ -16,7 +21,7 @@ except:
     print("Flask module not found, attempting install...")
     subprocess.run(['sh', 'scripts/installflask.sh'], cwd="/opt/usbode")
     print("Flask attempted install, trying to restart to force reload.")
-    exit(1)
+    quit(1)
 
 store_dev = '/dev/mmcblk0p3'
 store_mnt = '/mnt/imgstore'
@@ -24,7 +29,14 @@ allow_update_from_store = True
 gadgetCDFolder = '/sys/kernel/config/usb_gadget/usbode'
 iso_mount_file = '/opt/usbode/usbode-iso.txt'
 cdemu_cdrom = '/dev/cdrom'
-versionNum = "1.6"
+versionNum = "1.7"
+
+global fontM
+global fontS
+global fontL
+fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf",10)
+fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf",9)
+
 
 def version():
     print("USBODE - Turn your Pi Zero/Zero 2 into one a virtual USB CD-ROM drive")
@@ -114,10 +126,9 @@ def init_gadget(type):
     print(f"Initializing USBODE {type} gadget through configfs...")
     cleanupMode()
     os.makedirs(gadgetCDFolder, exist_ok=True)
-    os.chdir(gadgetCDFolder)
-    os.makedirs("strings/0x409", exist_ok=True)
-    os.makedirs("configs/c.1/strings/0x409", exist_ok=True)
-    os.makedirs("functions/mass_storage.usb0", exist_ok=True)
+    os.makedirs(gadgetCDFolder + "/strings/0x409", exist_ok=True)
+    os.makedirs(gadgetCDFolder +"/configs/c.1/strings/0x409", exist_ok=True)
+    os.makedirs(gadgetCDFolder +"/functions/mass_storage.usb0", exist_ok=True)
     if type == "cdrom":
         subprocess.run(['sh', 'scripts/cd_gadget_setup.sh',gadgetCDFolder ], cwd="/opt/usbode")
         with open(iso_mount_file, "r") as f:
@@ -220,10 +231,12 @@ help_cmds = [
 ]
 
 def start_exit():
+    if oledEnabled:
+        stopPiOled(disp)   
     disable_gadget()
     cleanupMode()
     subprocess.run(['rmmod', 'usb_f_mass_storage'])
-    subprocess.run(['rmmod', 'libcomposite'])    
+    subprocess.run(['rmmod', 'libcomposite'])
 
 def start_shutdown():
     print("Shutdown in progress...")
@@ -246,7 +259,15 @@ def main():
     else:
         init_gadget("exfat")
     time.sleep(.5)  # Delay for previous version script to exit
+    global oledEnabled
+    oledEnabled = True
     while True:
+        if oledEnabled:
+            print("OLED Display Enabled")
+            #Init 1.3" display
+            print("done displaying output")
+            oledDaemon = Thread(target=getOLEDinput, daemon=True, name='OLED')
+            oledDaemon.start()
         cmd = input("usbode> ")
         cmd = cmd.strip(' ')
         cmd_args = cmd.split(' ')
@@ -267,7 +288,7 @@ def main():
             version()
         elif cmd == 'exit':
             start_exit()
-            exit(0)
+            quit(0)
         elif cmd == 'shutdown':
             start_exit()
             start_shutdown()
@@ -276,6 +297,129 @@ def main():
         else:
             if cmd.strip(' ') != '':
                 print(f"Invalid command: {cmd}")            
+
+
+def changeISO_OLED(disp):
+    file_list=list_images()
+    iterator = 0
+    updateDisplay_FileS(disp, iterator, file_list)
+    while True:
+        time.sleep(0.1)
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_UP_PIN ) == 0:
+            pass
+        else:
+            iterator = iterator - 1
+            if iterator < 0:
+                iterator = len(file_list)-1
+            updateDisplay_FileS(disp, iterator, file_list)
+            print("Going up")
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_LEFT_PIN) == 0:
+            pass
+        else:
+            print("left")
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_RIGHT_PIN) == 0:
+            pass
+        else:
+            print("right")
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_DOWN_PIN) == 0:
+            pass
+        else: 
+            iterator = iterator + 1
+            if iterator > len(file_list)-1:
+                iterator = 0
+            updateDisplay_FileS(disp, iterator, file_list)
+            print (f"Selected {file_list[iterator]}")
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY1_PIN) == 0: # button is released
+            pass
+        else: # button is pressed:
+            print(f"loading {store_mnt}/{file_list[iterator]}")
+            requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
+            return True
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_PRESS_PIN) == 0: 
+            pass
+        else:
+            print(f"loading {store_mnt}/{file_list[iterator]}")
+            requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
+            return True
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0:
+            pass
+        else: 
+            print("CANCEL") 
+            return True
+
+def updateDisplay_FileS(disp, iterator, file_list):
+    image1 = Image.new('1', (disp.width, disp.height), "WHITE")
+    draw = ImageDraw.Draw(image1)
+    draw.text((0, 0), "Select an ISO:", font = fontL, fill = 0 )
+    draw.text((0, 12), "I: " + getMountedCDName(), font = fontS, fill = 0 )
+    draw.text((1,25), file_list[iterator], font = fontS, fill = 0 )
+    draw.line([(0,37),(127,37)], fill = 0)
+    disp.ShowImage(disp.getbuffer(image1))
+
+def updateDisplay(disp):
+    image1 = Image.new('1', (disp.width, disp.height), "WHITE")
+    draw = ImageDraw.Draw(image1)
+    draw.text((0, 0), "USBODE v:" + versionNum, font = fontL, fill = 0 )
+    draw.text((0, 12), "IP: " + myIPaddress, font = fontL, fill = 0 )
+    draw.text((0, 24), "ISO: " + str.replace(getMountedCDName(),store_mnt+'/',''), font = fontS, fill = 0 )
+    draw.text((0, 36), "Mode: " + str(checkState()), font = fontL, fill = 0 )
+    disp.ShowImage(disp.getbuffer(image1))
+
+def updateDisplay_Advanced(disp):
+    image1 = Image.new('1', (disp.width, disp.height), "WHITE")
+    draw = ImageDraw.Draw(image1)
+    draw.text((0, 0), "Advanced Menu:" + versionNum, font = fontL, fill = 0 )
+    draw.text((1,25), "Shutdown USBODE", font = fontS, fill = 0 )
+    draw.line([(0,37),(127,37)], fill = 0)
+    disp.ShowImage(disp.getbuffer(image1))
+    while True:
+        time.sleep(0.1)
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0:
+            pass
+        else: 
+            print("CANCEL") 
+            return True
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY1_PIN) == 0: # button is released
+            pass
+        else: # button is pressed:
+            requests.request('GET', f'http://127.0.0.1/shutdown')
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_PRESS_PIN) == 0: 
+            pass
+        else:
+            requests.request('GET', f'http://127.0.0.1/shutdown')
+       
+def getOLEDinput():
+    global disp
+    disp = SH1106.SH1106()
+    disp.Init()
+    disp.clear()
+    updateDisplay(disp)
+    while True:
+        time.sleep(0.1)
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY3_PIN) == 0: # button is released
+            pass
+        else: # button is pressed:
+            print("Changing MODE")
+            switch()
+            updateDisplay(disp)
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0: # button is released
+            pass
+        else: # button is pressed:
+            print("ADVANCED MENU")
+            updateDisplay_Advanced(disp)
+            updateDisplay(disp)
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY1_PIN) == 0: # button is released
+            pass
+        else: # button is pressed:
+            print("OK")
+            changeISO_OLED(disp)
+            updateDisplay(disp)
+
+
+
+def stopPiOled(disp):
+    print("Stopping OLED")
+    disp.RPI.module_exit()
 
 if __name__ == "__main__":
     main()
