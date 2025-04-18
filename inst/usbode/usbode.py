@@ -30,13 +30,15 @@ gadgetCDFolder = '/sys/kernel/config/usb_gadget/usbode'
 iso_mount_file = '/opt/usbode/usbode-iso.txt'
 cdemu_cdrom = '/dev/cdrom'
 versionNum = "1.7"
-
+global updateEvent
+updateEvent = 0
 global fontM
 global fontS
 global fontL
+global exitRequested
+exitRequested = 0
 fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf",10)
 fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf",9)
-
 
 def version():
     print("USBODE - Turn your Pi Zero/Zero 2 into one a virtual USB CD-ROM drive")
@@ -169,7 +171,7 @@ def switch():
             init_gadget("exfat")
             change_Loaded_Mount(f"{store_dev}")
             enable_gadget()
-        else:
+        if len(list_images()) > 0:
             print("Switching to CD-ROM mode")
             subprocess.run('sync')            
             disable_gadget()
@@ -218,7 +220,8 @@ def change_Loaded_Mount(filename):
             f.close()
             if checkState() == 2 and isoloading == True:
                 switch()
-        updateDisplay(disp)
+        global updateEvent
+        updateEvent = 1
         return True
 
 # Help information
@@ -233,7 +236,7 @@ help_cmds = [
     ['switch', 'Switch to the other mode (toggle like the hardware button)'],
 ]
 
-def start_exit():
+def start_exit(disp):
     if oledEnabled:
         stopPiOled(disp)   
     disable_gadget()
@@ -249,54 +252,64 @@ def start_flask():
     print("Starting Flask server...")
     app.run(host='0.0.0.0', port=80)
 
-
 def changeISO_OLED(disp):
     file_list=list_images()
     iterator = 0
-    updateDisplay_FileS(disp, iterator, file_list)
-    while True:
-        time.sleep(0.1)
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_UP_PIN ) == 0:
-            pass
-        else:
-            iterator = iterator - 1
-            if iterator < 0:
-                iterator = len(file_list)-1
-            updateDisplay_FileS(disp, iterator, file_list)
-            print("Going up")
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_LEFT_PIN) == 0:
-            pass
-        else:
-            print("left")
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_RIGHT_PIN) == 0:
-            pass
-        else:
-            print("right")
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_DOWN_PIN) == 0:
-            pass
-        else: 
-            iterator = iterator + 1
-            if iterator > len(file_list)-1:
-                iterator = 0
-            updateDisplay_FileS(disp, iterator, file_list)
-            print (f"Selected {file_list[iterator]}")
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY1_PIN) == 0: # button is released
-            pass
-        else: # button is pressed:
-            print(f"loading {store_mnt}/{file_list[iterator]}")
-            requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
-            return True
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY_PRESS_PIN) == 0: 
-            pass
-        else:
-            print(f"loading {store_mnt}/{file_list[iterator]}")
-            requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
-            return True
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0:
-            pass
-        else: 
-            print("CANCEL") 
-            return True
+    if len(file_list) < 1:
+        print("No images found in store, throwing error on screen.")
+        disp.clear()
+        image1 = Image.new('1', (disp.width, disp.height), "WHITE")
+        draw = ImageDraw.Draw(image1)
+        draw.text((0, 0), "No Images in store.", font = fontL, fill = 0 )
+        draw.text((0, 14), "Please add an image first.", font = fontL, fill = 0 )
+        disp.ShowImage(disp.getbuffer(image1))
+        time.sleep(.75)
+        return False
+    else:
+        updateDisplay_FileS(disp, iterator, file_list)
+        while True:
+            time.sleep(0.1)
+            if disp.RPI.digital_read(disp.RPI.GPIO_KEY_UP_PIN ) == 0:
+                pass
+            else:
+                iterator = iterator - 1
+                if iterator < 0:
+                    iterator = len(file_list)-1
+                updateDisplay_FileS(disp, iterator, file_list)
+                print("Going up")
+            if disp.RPI.digital_read(disp.RPI.GPIO_KEY_LEFT_PIN) == 0:
+                pass
+            else:
+                print("left")
+            if disp.RPI.digital_read(disp.RPI.GPIO_KEY_RIGHT_PIN) == 0:
+                pass
+            else:
+                print("right")
+            if disp.RPI.digital_read(disp.RPI.GPIO_KEY_DOWN_PIN) == 0:
+                pass
+            else: 
+                iterator = iterator + 1
+                if iterator > len(file_list)-1:
+                    iterator = 0
+                updateDisplay_FileS(disp, iterator, file_list)
+                print (f"Selected {file_list[iterator]}")
+            if disp.RPI.digital_read(disp.RPI.GPIO_KEY1_PIN) == 0: # button is released
+                pass
+            else: # button is pressed:
+                print(f"loading {store_mnt}/{file_list[iterator]}")
+                requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
+                return True
+            if disp.RPI.digital_read(disp.RPI.GPIO_KEY_PRESS_PIN) == 0: 
+                pass
+            else:
+                print(f"loading {store_mnt}/{file_list[iterator]}")
+                requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
+                return True
+            if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0:
+                pass
+            else: 
+                print("CANCEL") 
+                return True
 
 def updateDisplay_FileS(disp, iterator, file_list):
     image1 = Image.new('1', (disp.width, disp.height), "WHITE")
@@ -340,12 +353,12 @@ def updateDisplay_Advanced(disp):
             requests.request('GET', f'http://127.0.0.1/shutdown')
        
 def getOLEDinput():
-    global disp
-    disp = SH1106.SH1106()
     disp.Init()
     disp.clear()
     updateDisplay(disp)
     while True:
+        global updateEvent
+        global exitRequested
         time.sleep(0.1)
         if disp.RPI.digital_read(disp.RPI.GPIO_KEY3_PIN) == 0: # button is released
             pass
@@ -365,12 +378,18 @@ def getOLEDinput():
             print("OK")
             changeISO_OLED(disp)
             updateDisplay(disp)
-
+        if updateEvent == 1:
+            updateDisplay(disp)
+            updateEvent = 0
+        if exitRequested == 1:
+            break
 
 
 def stopPiOled(disp):
     print("Stopping OLED")
     disp.RPI.module_exit()
+    global exitRequested
+    exitRequested = 1
 
 def main():
     #Setup Environment
@@ -389,6 +408,8 @@ def main():
     oledEnabled = True
     while True:
         if oledEnabled:
+            global disp
+            disp = SH1106.SH1106()
             print("OLED Display Enabled")
             #Init 1.3" display
             print("done displaying output")
@@ -413,10 +434,10 @@ def main():
         elif cmd == 'version':
             version()
         elif cmd == 'exit':
-            start_exit()
+            start_exit(disp)
             quit(0)
         elif cmd == 'shutdown':
-            start_exit()
+            start_exit(disp)
             start_shutdown()
         elif cmd == 'switch':
             switch()
