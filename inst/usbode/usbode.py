@@ -3,10 +3,15 @@ import sys
 import os
 ScriptPath=os.path.dirname(__file__)
 sys.path.append(f"{ScriptPath}/waveshare")
-import SH1106
+global oledEnabled
+try:
+    import SH1106
+    from PIL import Image, ImageDraw, ImageFont
+    oledEnabled = True
+except:
+    pass    
 import time
 import subprocess
-from PIL import Image, ImageDraw, ImageFont
 import requests
 from gpiozero import *
 from pathlib import Path
@@ -43,7 +48,7 @@ fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf",9)
 def version():
     print("USBODE - Turn your Pi Zero/Zero 2 into one a virtual USB CD-ROM drive")
     print("Web Functionality and massive rewrite Danifunker: https://github.com/danifunker/usbode\n")
-    print("USBODE version ${versionNum}")
+    print(f"USBODE version ${versionNum}")
 
 global myIPaddress
 
@@ -84,6 +89,7 @@ def shutdown():
 @app.route('/exit')
 def exit():
     start_exit()
+    Thread.is_alive == 0
     return f"Exiting the app now"
 @app.route('/setup')
 def setup():
@@ -171,12 +177,13 @@ def switch():
             init_gadget("exfat")
             change_Loaded_Mount(f"{store_dev}")
             enable_gadget()
-        if len(list_images()) > 0:
-            print("Switching to CD-ROM mode")
-            subprocess.run('sync')            
-            disable_gadget()
-            init_gadget("cdrom")
-            enable_gadget()
+        else:
+            if len(list_images()) > 0:
+                print("Switching to CD-ROM mode")
+                subprocess.run('sync')            
+                disable_gadget()
+                init_gadget("cdrom")
+                enable_gadget()
 
 def checkState(gadgetFolder=gadgetCDFolder):
     #Return Mode of the gadget 0 = not enabled, 1 = cdrom, 2 = exfat
@@ -236,9 +243,11 @@ help_cmds = [
     ['switch', 'Switch to the other mode (toggle like the hardware button)'],
 ]
 
-def start_exit(disp):
+def start_exit():
+    global disp
+    global oledEnabled
     if oledEnabled:
-        stopPiOled(disp)   
+        stopPiOled()   
     disable_gadget()
     cleanupMode()
     subprocess.run(['rmmod', 'usb_f_mass_storage'])
@@ -263,7 +272,7 @@ def changeISO_OLED(disp):
         draw.text((0, 0), "No Images in store.", font = fontL, fill = 0 )
         draw.text((0, 14), "Please add an image first.", font = fontL, fill = 0 )
         disp.ShowImage(disp.getbuffer(image1))
-        time.sleep(.75)
+        time.sleep(1.5)
         return False
     else:
         updateDisplay_FileS(disp, iterator, file_list)
@@ -337,7 +346,7 @@ def updateDisplay_Advanced(disp):
     draw.line([(0,37),(127,37)], fill = 0)
     disp.ShowImage(disp.getbuffer(image1))
     while True:
-        time.sleep(0.1)
+        time.sleep(0.3)
         if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0:
             pass
         else: 
@@ -353,12 +362,13 @@ def updateDisplay_Advanced(disp):
             requests.request('GET', f'http://127.0.0.1/shutdown')
        
 def getOLEDinput():
+    global disp
     disp.Init()
     disp.clear()
     updateDisplay(disp)
-    while True:
+    global exitRequested
+    while exitRequested == 0:
         global updateEvent
-        global exitRequested
         time.sleep(0.1)
         if disp.RPI.digital_read(disp.RPI.GPIO_KEY3_PIN) == 0: # button is released
             pass
@@ -381,18 +391,17 @@ def getOLEDinput():
         if updateEvent == 1:
             updateDisplay(disp)
             updateEvent = 0
-        if exitRequested == 1:
-            break
 
-
-def stopPiOled(disp):
-    print("Stopping OLED")
-    disp.RPI.module_exit()
+def stopPiOled():
+    global disp
     global exitRequested
     exitRequested = 1
+    print("Stopping OLED")
+    disp.RPI.module_exit()
 
 def main():
     #Setup Environment
+    global exitRequested
     print("Starting USBODE...")
     print(f"Mounting image store on {store_mnt}...")
     subprocess.run(['mount', store_dev, store_mnt, '-o', 'umask=000'])
@@ -405,45 +414,47 @@ def main():
         init_gadget("exfat")
     time.sleep(.5)  # Delay for previous version script to exit
     global oledEnabled
-    oledEnabled = True
-    while True:
-        if oledEnabled:
-            global disp
-            disp = SH1106.SH1106()
-            print("OLED Display Enabled")
-            #Init 1.3" display
-            print("done displaying output")
-            oledDaemon = Thread(target=getOLEDinput, daemon=True, name='OLED')
-            oledDaemon.start()
-        cmd = input("usbode> ")
-        cmd = cmd.strip(' ')
-        cmd_args = cmd.split(' ')
-        cmd = cmd_args[0]
-        if cmd == 'help':
-            for help_cmd in help_cmds:
-                if len(help_cmd) == 0:
-                    continue
-                else:
-                    print(f"{help_cmd[0]}", end='')
-                    if len(help_cmd) == 2:
-                        indent = '\t\t' if (len(help_cmd[0]) < 8) else '\t'
-                        print(f"{indent}{help_cmd[1]}")
-                    if len(help_cmd) > 2:
-                        for i in range(2,len(help_cmd)):
-                            print(f"\t\t{help_cmd[i]}")
-        elif cmd == 'version':
-            version()
-        elif cmd == 'exit':
-            start_exit(disp)
-            quit(0)
-        elif cmd == 'shutdown':
-            start_exit(disp)
-            start_shutdown()
-        elif cmd == 'switch':
-            switch()
-        else:
-            if cmd.strip(' ') != '':
-                print(f"Invalid command: {cmd}")            
+    if oledEnabled:
+        global disp
+        disp = SH1106.SH1106()
+        print("OLED Display Enabled")
+        #Init 1.3" display
+        print("done displaying output")
+        oledDaemon = Thread(target=getOLEDinput, daemon=True, name='OLED')
+        oledDaemon.start()
+    while exitRequested == 0:
+        pass
+        # cmd = input("usbode> ")
+        # cmd = cmd.strip(' ')
+        # cmd_args = cmd.split(' ')
+        # cmd = cmd_args[0]
+        # if cmd == 'help':
+        #     for help_cmd in help_cmds:
+        #         if len(help_cmd) == 0:
+        #             continue
+        #         else:
+        #             print(f"{help_cmd[0]}", end='')
+        #             if len(help_cmd) == 2:
+        #                 indent = '\t\t' if (len(help_cmd[0]) < 8) else '\t'
+        #                 print(f"{indent}{help_cmd[1]}")
+        #             if len(help_cmd) > 2:
+        #                 for i in range(2,len(help_cmd)):
+        #                     print(f"\t\t{help_cmd[i]}")
+        # elif cmd == 'version':
+        #     version()
+        # elif cmd == 'exit':
+        #     start_exit()
+        #     quit(0)
+        # elif cmd == 'shutdown':
+        #     start_exit()
+        #     start_shutdown()
+        # elif cmd == 'switch':
+        #     switch()
+        # else:
+        #     if cmd.strip(' ') != '':
+        #         print(f"Invalid command: {cmd}")  
+    start_exit()
+    quit(0)
 
 if __name__ == "__main__":
     main()
