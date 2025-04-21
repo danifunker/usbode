@@ -26,8 +26,8 @@ display_auto_detect=1
 auto_initramfs=1
 
 # Enable DRM VC4 V3D driver
-dtoverlay=vc4-kms-v3d,noaudio
-max_framebuffers=2
+dtoverlay=vc4-kms-v3d,noaudio,nohdmi
+max_framebuffers=1
 
 # Don't have the firmware create an initial video= setting in cmdline.txt.
 # Use the kernel's default instead.
@@ -38,6 +38,14 @@ disable_overscan=1
 
 # Run as fast as firmware / board allows
 arm_boost=1
+
+#Tweaking for fast boot
+disable_poe_fan=1
+disable_touchscreen=1
+camera_auto_detect=0
+display_auto_detect=0
+dtoverlay=disable-bt
+boot_delay=0
 
 [cm4]
 # Enable host mode on the 2711 built-in XHCI USB controller.
