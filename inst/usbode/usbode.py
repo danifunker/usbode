@@ -17,7 +17,6 @@ from gpiozero import *
 from pathlib import Path
 from threading import Thread
 import time
-import socket
 import urllib.parse
 
 try: 
@@ -51,21 +50,25 @@ def version():
     print(f"USBODE version ${versionNum}")
 
 global myIPAddress
-def getMyIPAddress(oldIP="Unable to determine IP address."):
-    try:
-        myIPaddress = socket.gethostbyname(socket.gethostname() + '.local')
-    except:
-        myIPaddress = "Unable to determine IP address."
-    if myIPaddress != oldIP:
-        global updateEvent
-        updateEvent = 1
-    return myIPaddress
-myIPAddress = getMyIPAddress
+myIPAddress = "Unable to determine IP address"
+
+def getMyIPAddress():
+    while True:
+        global myIPAddress
+        time.sleep(1)
+        try:
+            ipAddressAttempt = subprocess.check_output(['hostname', '-I']).decode('utf-8').strip().split(' ')[0]
+        except:
+            ipAddressAttempt = "Unable to determine IP address"
+        if ipAddressAttempt != myIPAddress:
+            global updateEvent
+            updateEvent = 1
+        myIPAddress = ipAddressAttempt
 
 app = Flask(__name__)
 @app.route('/')
 def index():
-    return f"Welcome to USBODE, the USB Optical Drive Emulator!<br> My IP address is {getMyIPAddress(myIPAddress)}. <br> I am currently running from {os.path.abspath(__file__)} .<br>To switch modes click here: <a href='/switch'>/switch</a> <br> Currently Serving: {getMountedCDName()}. <br> Current Mode is: {checkState()} <br> <a href='/list'>Load Another Image</a><br><br>Version Number {versionNum}<br><br><a href='/shutdown'>Shutdown the pi</a>"
+    return f"Welcome to USBODE, the USB Optical Drive Emulator!<br> My IP address is {myIPAddress}. <br> I am currently running from {os.path.abspath(__file__)} .<br>To switch modes click here: <a href='/switch'>/switch</a> <br> Currently Serving: {getMountedCDName()}. <br> Current Mode is: {checkState()} <br> <a href='/list'>Load Another Image</a><br><br>Version Number {versionNum}<br><br><a href='/shutdown'>Shutdown the pi</a>"
 @app.route('/switch')  
 def switch():
     switch()
@@ -133,7 +136,7 @@ def cleanupMode(gadgetFolder=gadgetCDFolder):
     #Cleanup the gadget folder
     print("Unloading Gadget")
     subprocess.run(['sh', 'scripts/cleanup_mode.sh', gadgetFolder], cwd="/opt/usbode")
-    time.sleep(1)
+    time.sleep(.25)
 
 def init_gadget(type):
     print(f"Initializing USBODE {type} gadget through configfs...")
@@ -277,12 +280,12 @@ def changeISO_OLED(disp):
         draw.text((0, 0), "No Images in store.", font = fontL, fill = 0 )
         draw.text((0, 14), "Please add an image first.", font = fontL, fill = 0 )
         disp.ShowImage(disp.getbuffer(image1))
-        time.sleep(1.5)
+        time.sleep(0.15)
         return False
     else:
         updateDisplay_FileS(disp, iterator, file_list)
         while True:
-            time.sleep(0.1)
+            time.sleep(0.15)
             if disp.RPI.digital_read(disp.RPI.GPIO_KEY_UP_PIN ) == 0:
                 pass
             else:
@@ -338,7 +341,7 @@ def updateDisplay(disp):
     image1 = Image.new('1', (disp.width, disp.height), "WHITE")
     draw = ImageDraw.Draw(image1)
     draw.text((0, 0), "USBODE v:" + versionNum, font = fontL, fill = 0 )
-    draw.text((0, 12), "IP: " + getMyIPAddress(myIPAddress), font = fontL, fill = 0 )
+    draw.text((0, 12), "IP: " + myIPAddress, font = fontL, fill = 0 )
     draw.text((0, 24), "ISO: " + str.replace(getMountedCDName(),store_mnt+'/',''), font = fontS, fill = 0 )
     draw.text((0, 36), "Mode: " + str(checkState()), font = fontL, fill = 0 )
     disp.ShowImage(disp.getbuffer(image1))
@@ -351,7 +354,7 @@ def updateDisplay_Advanced(disp):
     draw.line([(0,37),(127,37)], fill = 0)
     disp.ShowImage(disp.getbuffer(image1))
     while True:
-        time.sleep(0.3)
+        time.sleep(0.15)
         if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0:
             pass
         else: 
@@ -375,9 +378,8 @@ def getOLEDinput():
     global myIPAddress
     while exitRequested == 0:
         #Scan for IP address changes and update the screen if found
-        myIPAddress = getMyIPAddress(myIPAddress)
         global updateEvent
-        time.sleep(0.1)
+        time.sleep(0.15)
         if disp.RPI.digital_read(disp.RPI.GPIO_KEY3_PIN) == 0: # button is released
             pass
         else: # button is pressed:
@@ -414,13 +416,15 @@ def main():
     print(f"Mounting image store on {store_mnt}...")
     subprocess.run(['mount', store_dev, store_mnt, '-o', 'umask=000'])
     subprocess.run(['modprobe', 'libcomposite'])
+    #Start IP scanning daemon, hopefully to speed up startup
+    daemonIPScanner = Thread(target=getMyIPAddress, daemon=True, name='IP Scanner')
+    daemonIPScanner.start()
     daemon = Thread(target=start_flask, daemon=True, name='Server')
     daemon.start()
     if os.path.exists(iso_mount_file):
         init_gadget("cdrom")
     else:
         init_gadget("exfat")
-    time.sleep(.5)  # Delay for previous version script to exit
     global oledEnabled
     if oledEnabled:
         global disp
