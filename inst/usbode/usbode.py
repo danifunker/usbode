@@ -50,17 +50,22 @@ def version():
     print("Web Functionality and massive rewrite Danifunker: https://github.com/danifunker/usbode\n")
     print(f"USBODE version ${versionNum}")
 
-global myIPaddress
-
-try:
-    myIPaddress = socket.gethostbyname(socket.gethostname() + '.local')
-except:
-    myIPaddress = "Unable to determine IP address. Reboot the Pi, and this issue should be resolved."
+global myIPAddress
+def getMyIPAddress(oldIP="Unable to determine IP address."):
+    try:
+        myIPaddress = socket.gethostbyname(socket.gethostname() + '.local')
+    except:
+        myIPaddress = "Unable to determine IP address."
+    if myIPaddress != oldIP:
+        global updateEvent
+        updateEvent = 1
+    return myIPaddress
+myIPAddress = getMyIPAddress
 
 app = Flask(__name__)
 @app.route('/')
 def index():
-    return f"Welcome to USBODE, the USB Optical Drive Emulator!<br> My IP address is {myIPaddress}. <br> I am currently running from {os.path.abspath(__file__)} .<br>To switch modes click here: <a href='/switch'>/switch</a> <br> Currently Serving: {getMountedCDName()}. <br> Current Mode is: {checkState()} <br> <a href='/list'>Load Another Image</a><br><br>Version Number {versionNum}<br><br><a href='/shutdown'>Shutdown the pi</a>"
+    return f"Welcome to USBODE, the USB Optical Drive Emulator!<br> My IP address is {getMyIPAddress(myIPAddress)}. <br> I am currently running from {os.path.abspath(__file__)} .<br>To switch modes click here: <a href='/switch'>/switch</a> <br> Currently Serving: {getMountedCDName()}. <br> Current Mode is: {checkState()} <br> <a href='/list'>Load Another Image</a><br><br>Version Number {versionNum}<br><br><a href='/shutdown'>Shutdown the pi</a>"
 @app.route('/switch')  
 def switch():
     switch()
@@ -333,7 +338,7 @@ def updateDisplay(disp):
     image1 = Image.new('1', (disp.width, disp.height), "WHITE")
     draw = ImageDraw.Draw(image1)
     draw.text((0, 0), "USBODE v:" + versionNum, font = fontL, fill = 0 )
-    draw.text((0, 12), "IP: " + myIPaddress, font = fontL, fill = 0 )
+    draw.text((0, 12), "IP: " + getMyIPAddress(myIPAddress), font = fontL, fill = 0 )
     draw.text((0, 24), "ISO: " + str.replace(getMountedCDName(),store_mnt+'/',''), font = fontS, fill = 0 )
     draw.text((0, 36), "Mode: " + str(checkState()), font = fontL, fill = 0 )
     disp.ShowImage(disp.getbuffer(image1))
@@ -367,7 +372,10 @@ def getOLEDinput():
     disp.clear()
     updateDisplay(disp)
     global exitRequested
+    global myIPAddress
     while exitRequested == 0:
+        #Scan for IP address changes and update the screen if found
+        myIPAddress = getMyIPAddress(myIPAddress)
         global updateEvent
         time.sleep(0.1)
         if disp.RPI.digital_read(disp.RPI.GPIO_KEY3_PIN) == 0: # button is released
