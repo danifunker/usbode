@@ -10,7 +10,7 @@ root_mount=$(findmnt -Ufnro SOURCE -M /)
 root_drive=$(lsblk -npro PKNAME "$root_mount")
 root_partition=${root_mount: -1}
 
-parted -a optimal $root_drive --script mkpart primary 8092 100%
+parted -a optimal $root_drive --script mkpart primary 3072 100%
 #Parted doesn't support building exFat partitions so use sfdisk to change the type
 sfdisk "${root_drive}" 3 --part-type 7
 /usr/sbin/mkfs.exfat -L imgstore "${root_drive}p3"
