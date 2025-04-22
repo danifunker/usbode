@@ -1,0 +1,9 @@
+[Unit]
+Description=Check for Wi-Fi settings change on boot
+
+[Service]
+Type=oneshot
+ExecStart=ExecStart=/usr/bin/python3 /opt/usbode/network-updater.py 
+
+[Install]
+WantedBy=multi-user.target

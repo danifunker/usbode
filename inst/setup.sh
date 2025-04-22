@@ -23,9 +23,13 @@ resize2fs -p $root_mount
 #Install USBODE and enable service
 mkdir -p /opt/usbode
 cp -R /boot/firmware/usbode/* /opt/usbode
-cp /boot/firmware/usbode.service /lib/systemd/system
+cp /boot/firmware/*.service /lib/systemd/system
 chmod 664 /lib/systemd/system/usbode.service
+chmod 664 /lib/systemd/system/new-wifi-onboot.service
+
 systemctl enable usbode.service
+systemctl enable new-wifi-onboot.service
+systemctl enable pigpiod.service
 
 #Continue with "normal" Pi installation including script
 source /usr/lib/raspberrypi-sys-mods/firstbootpost

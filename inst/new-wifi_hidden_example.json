@@ -1,0 +1,6 @@
+{
+    "SSID": "YourNetworkSSID",
+    "Password": "YourNetworkPassword",
+    "SecurityType": "wifi-sec.key-mgmt wpa-psk wifi-sec.psk",
+    "IsSSIDHidden": true
+}  
