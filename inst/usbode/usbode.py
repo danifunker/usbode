@@ -4,12 +4,17 @@ import os
 ScriptPath=os.path.dirname(__file__)
 sys.path.append(f"{ScriptPath}/waveshare")
 global oledEnabled
+global fontM
+global fontS
+global fontL
 try:
     import SH1106
     from PIL import Image, ImageDraw, ImageFont
     oledEnabled = True
+    fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf",10)
+    fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf",9)
 except:
-    pass    
+    oledEnabled = False
 import time
 import subprocess
 import requests
@@ -29,13 +34,8 @@ cdemu_cdrom = '/dev/cdrom'
 versionNum = "1.8"
 global updateEvent
 updateEvent = 0
-global fontM
-global fontS
-global fontL
 global exitRequested
 exitRequested = 0
-fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf",10)
-fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf",9)
 
 def version():
     print("USBODE - Turn your Pi Zero/Zero 2 into one a virtual USB CD-ROM drive")
@@ -411,3 +411,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -27,12 +27,11 @@
 # THE SOFTWARE.
 #
 
-
 import time
 from smbus import SMBus
-import spidev
 import ctypes
 from gpiozero import *
+import spidev
 
 # Pin definition
 RST_PIN         = 25
@@ -51,6 +50,7 @@ KEY3_PIN       = 16
 
 Device_SPI = 1
 Device_I2C = 0
+
 
 class RaspberryPi:
     def __init__(self,spi=spidev.SpiDev(0,0),spi_freq=40000000,rst = 27,dc = 25,bl = 18,bl_freq=1000,i2c=None):
@@ -128,4 +128,3 @@ class RaspberryPi:
         self.digital_write(self.GPIO_RST_PIN,False)
         self.digital_write(self.GPIO_DC_PIN,False)
 
-### END OF FILE ###

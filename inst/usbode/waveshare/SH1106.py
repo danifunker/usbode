@@ -1,18 +1,32 @@
-import config
 import time
-
-Device_SPI = config.Device_SPI
-Device_I2C = config.Device_I2C
+import subprocess
 
 LCD_WIDTH   = 128 #LCD width
 LCD_HEIGHT  = 64  #LCD height
-
+global Device_SPI
+global Device_I2C
+Device_SPI=0
+Device_I2C=0
 class SH1106(object):
     def __init__(self):
         self.width = LCD_WIDTH
         self.height = LCD_HEIGHT
+        global Device_SPI
+        global Device_I2C
         #Initialize DC RST pin
-        self.RPI = config.RaspberryPi()
+        loadedModules=subprocess.check_output(['cat','/proc/modules']).decode('utf-8')
+        if 'spidev' in loadedModules:
+            import configspi as config
+            self.RPI = config.RaspberryPi()
+            Device_SPI = config.Device_SPI
+            Device_I2C = config.Device_I2C
+
+        else:
+            import configi2c as config
+            Device_SPI = config.Device_SPI
+            Device_I2C = config.Device_I2C
+            self.RPI = config.RaspberryPi()
+ 
         self._dc = self.RPI.GPIO_DC_PIN
         self._rst = self.RPI.GPIO_RST_PIN
         self.Device = self.RPI.Device
