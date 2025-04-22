@@ -302,8 +302,8 @@ def updateDisplay_FileS(disp, iterator, file_list):
     image1 = Image.new('1', (disp.width, disp.height), "WHITE")
     draw = ImageDraw.Draw(image1)
     draw.text((0, 0), "Select an ISO:", font = fontL, fill = 0 )
-    draw.text((0, 12), "I: " + getMountedCDName(), font = fontS, fill = 0 )
-    draw.text((1,25), file_list[iterator], font = fontS, fill = 0 )
+    draw.text((0, 12), "I: " + str.replace(getMountedCDName(),store_mnt+'/',''), font = fontL, fill = 0 )
+    draw.text((1,25), file_list[iterator], font = fontL, fill = 0 )
     draw.line([(0,37),(127,37)], fill = 0)
     disp.ShowImage(disp.getbuffer(image1))
 
@@ -312,7 +312,7 @@ def updateDisplay(disp):
     draw = ImageDraw.Draw(image1)
     draw.text((0, 0), "USBODE v:" + versionNum, font = fontL, fill = 0 )
     draw.text((0, 12), "IP: " + myIPAddress, font = fontL, fill = 0 )
-    draw.text((0, 24), "ISO: " + str.replace(getMountedCDName(),store_mnt+'/',''), font = fontS, fill = 0 )
+    draw.text((0, 24), "ISO: " + str.replace(getMountedCDName(),store_mnt+'/',''), font = fontL, fill = 0 )
     draw.text((0, 36), "Mode: " + str(checkState()), font = fontL, fill = 0 )
     disp.ShowImage(disp.getbuffer(image1))
 

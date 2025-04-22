@@ -1,0 +1,1 @@
+sudo apt install -y flex bison libncurses-dev libssl-dev
