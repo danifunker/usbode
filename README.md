@@ -1,10 +1,10 @@
 # USBODE
 
-### Turn your Pi Zero W / Zero W 2 into a virtual USB CD-ROM drive!
+### Turn your Pi Zero W 2 into a virtual USB CD-ROM drive!
 
 USBODE is a set of scripts that uses the Linux USB Gadget kernel modules to turn your Raspberry Pi Zero (W) or aspberry Pi Zero 2 (W) into one or more emulated USB CD-ROM drives. This new version utilizes `configfs`.
 
-**Documentation is a work in progress.**
+*** This project did support Pi Zero W but this is currently untested as of v1.8. I am using a new custom kernel and am unsure if this works with that model ***
 
 ## New Install process (not yet completed)
 1. **Prepare the SD Card**
@@ -21,15 +21,17 @@ If no iso files are found on the sdcard, USBODE will automatically go into "USB 
 ## Usage
 3. Main interface
 
--  The USBODE interface will take about 30 seconds to startup, once configured.
--  For Initial setup, follow instructions at `http://<IPAddress>/setup`
--  Once the first image is mounted, e
+-  The USBODE interface will take about 30 (18 seconds with an A2 class microSD card) seconds to startup, once configured.
+-  Initially drop some files from your computer into imgstore
 -  Everything is controlled via web, navigate to `http://<IPAddress>` or http://<name from preconfigured hostname in step 1>
+-  This project also supports the Waveshare 1.3" OLED HAT in SPI and I2C modes, details: https://www.waveshare.com/wiki/1.3inch_OLED_HAT
 
 4. Adding files via Network / wifi  -- This is limited to Wi-Fi N speeds (or slower)
    a. Make sure the device is in Mode 1 (ISO serving mode)
-   b. Use an ssh / sftp client to connect to `<IPAddress>`. Nagivate to `/mnt/imgstore`. Drop files here
-   c. To load the new file use the web interface. The file list is refereshed every time the `/setup` or `/list` is accessed.
+   b. Use an FTP / ssh / sftp client to connect to `<IPAddress>`. Nagivate to `/mnt/imgstore`. Drop files here. If using FTP the path will automatically be set for you, don't forget to use port 21 as the port, and there is no encryption through this method.
+   d. To load the new file use the web interface, or the on-screen display.
+
+5. To change the Wireless network the Raspberry Pi is associated with, shutdown the Pi, eject the microSD card and place it back into the computer. Open up the `bootfs` volume and copy the new-wifi_example.json to new-wifi.json. Enter the new SSID and password. Since this is a JSON file, only to change what is between the `" "`. Safely eject the microsd card and place it back into the Raspberry Pi. The file will be read about 5 seconds after the USBODE starts and it will attempt to connect to the new wifi. If any issues occur, shutdown the USBODE and plug the SDCard back into the computer, and review the file named `new-wifi-output.txt` in the `bootfs` volume.
 
 ## Application notes
 * Since the configfs settings are reloaded between configurations, and entirely destroyed on a reboot, I have opted to store the most recently loaded ISO filename into `/opt/usbode/usbode-iso.txt`. Not having this file should not cause any issues, since there is a setup endpoint that can be used for initial configuration, however I haven't tested that code path yet.

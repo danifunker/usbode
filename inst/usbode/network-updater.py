@@ -1,4 +1,4 @@
- #!/usr/bin/env python3
+#!/usr/bin/env python3
 import sys
 import os
 import time
@@ -23,6 +23,8 @@ else:
 
 if NetworkSettingsFileContents:
     runCommands=[]
+    time.sleep(5)
+    runCommands.append(f"nmcli d wifi")
     if NetworkSettingsFileContents['IsSSIDHidden']:
         runCommands.append(f"nmcli c add type wifi con-name {NetworkSettingsFileContents['SSID']} ifname wlan0 ssid {NetworkSettingsFileContents['SSID']}")
         if NetworkSettingsFileContents['Password']:
