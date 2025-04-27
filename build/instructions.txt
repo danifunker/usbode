@@ -12,15 +12,17 @@
     * `mkdir -p /tmp/initfs`
     * `cd /tmp/initfs`
     * `cat /boot/initramfs7l | unzstd -- |cpio -idvm `
-    * edit the file `/tmp/initfs/scripts/local-premount/firstboot` and change line 56 from `do_resize` to `log_warning_msg "Resize skipped due to resizing in another section"`
+    * edit the file `/tmp/initfs/scripts/local-premount/firstboot` and change line 56 from `do_resize` to `log_warning_msg "Resize skipped due to resizing in another section for USBODE"`
     * `cd /tmp/initfs`
     * `find . -print0| sort -z | cpio --null -H newc --quiet -o > ../initramfs.img`
     * `cd ..`
-    * `cat initramfs.img | zstd >> /boot/initramfs7l`
+    * `cat initramfs.img | zstd >> /boot/initrd.img-6.6.51+rpt-rpi-v8`
     * repeat this for each of the initramfs files
     * once all mondifications have been done to the image, use `CTRL + D` to exit the mode.
 10) Copy the file back to a computer
 11) use xz on the .img file to make a new one.
+
+/usr/share/initramfs-tools# vi scripts/local-premount/firstboot
 
 Also did the following things on 04/18/2025:
 
