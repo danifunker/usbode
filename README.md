@@ -59,6 +59,16 @@ It is also possible to startup a second USB interface, possibly a COM port to be
 
 Feel free to contribue to the project.
 
+## Discord Server
+For updates on this project please visit the discord server here: https://discord.gg/na2qNrvdFY
+
+## Youtube Video
+I created a youtube video which covers the old installation process. The new process is almost the same, just no files are required to copy after imaging the device.
+
+Here is a link to my how-to video: https://www.youtube.com/watch?v=o7qsI4J0sys
+
+This project will also be featured on video on [PhilsComputerLab](https://www.youtube.com/channel/UCj9IJ2QvygoBJKSOnUgXIRA)! Once the video is released I will link it directly here. For now pleaase like and subscribe to Phil so you can stay up to date on this project and many other cool retro computing things!
+
 ## Donations
 
 Support me on ko-fi!
