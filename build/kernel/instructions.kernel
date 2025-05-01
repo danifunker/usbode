@@ -1,0 +1,21 @@
+To get the hash of the official build being used by RPI:
+
+Go to the raspberry pi repo: https://github.com/raspberrypi/firmware
+
+Go into releases and find what the version you are trying to build from.
+
+Navigate to extras/git_hash and grab that git hash.
+
+next, go to the raspberry pi linux kernel repo, clone the branch of the kernel version that you want, do not use --depth=1 .
+
+Get the current kernel config from /boot/config-$(uname -r) and copy that to `.config` in the new kernel source
+
+Next, go and perform menuconfig and continue on from there...
+
+Once built, test it out.
+
+If it's working, go ahead and do 
+
+make deb-pkg
+
+Then we can install the packages locally afterwards, the headers and the modules will get installed the same way that it's officially done.
