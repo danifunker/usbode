@@ -1,7 +1,7 @@
 cd $1
 
 echo "0x04da" > idVendor  # Linux Foundation - must be adopted by your ID
-echo "00d01" > idProduct # Linux-USB file backed Storage Gadget - must be adopted by your ProductID
+echo "0x0d01" > idProduct # Linux-USB file backed Storage Gadget - must be adopted by your ProductID
 echo 0x0100 > bcdDevice   # v1.0.0
 echo 0x0200 > bcdUSB      # USB 2.0
 
