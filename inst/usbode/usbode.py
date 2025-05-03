@@ -405,7 +405,7 @@ def main():
         oledDaemon = Thread(target=getOLEDinput, daemon=True, name='OLED')
         oledDaemon.start()
     while exitRequested == 0:
-        time.sleep(1)
+        time.sleep(0.0125)
     start_exit()
     quit(0)
 
