@@ -237,7 +237,7 @@ def start_shutdown():
 
 def start_flask():
     print("Starting Flask server...")
-    app.run(host='0.0.0.0', port=80)
+    app.run(host='::', port=80)
 
 def changeISO_OLED(disp):
     file_list=list_images()
