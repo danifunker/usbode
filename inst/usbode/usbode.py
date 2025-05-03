@@ -1,4 +1,4 @@
- #!/usr/bin/env python3
+#!/usr/bin/env python3
 import sys
 import os
 ScriptPath=os.path.dirname(__file__)
@@ -405,7 +405,7 @@ def main():
         oledDaemon = Thread(target=getOLEDinput, daemon=True, name='OLED')
         oledDaemon.start()
     while exitRequested == 0:
-        pass
+        time.sleep(0.15)
     start_exit()
     quit(0)
 
