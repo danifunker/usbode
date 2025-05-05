@@ -31,7 +31,7 @@ allow_update_from_store = True
 gadgetCDFolder = '/sys/kernel/config/usb_gadget/usbode'
 iso_mount_file = '/opt/usbode/usbode-iso.txt'
 cdemu_cdrom = '/dev/cdrom'
-versionNum = "1.8"
+versionNum = "1.9"
 global updateEvent
 updateEvent = 0
 global exitRequested
