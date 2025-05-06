@@ -69,7 +69,7 @@ Here is a link to my how-to video: https://www.youtube.com/watch?v=o7qsI4J0sys
 
 This project will also be featured on video on [PhilsComputerLab](https://www.youtube.com/channel/UCj9IJ2QvygoBJKSOnUgXIRA)!
 Here is his [first video](https://www.youtube.com/watch?v=Is3ULD0ZXnI).
-Pleaase like and subscribe to Phil so you can stay up to date on this project and many other cool retro computing things!
+Please like and subscribe to Phil so you can stay up to date on this project and many other cool retro computing things!
 
 ## Donations
 
