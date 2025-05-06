@@ -67,7 +67,9 @@ I created a youtube video which covers the old installation process. The new pro
 
 Here is a link to my how-to video: https://www.youtube.com/watch?v=o7qsI4J0sys
 
-This project will also be featured on video on [PhilsComputerLab](https://www.youtube.com/channel/UCj9IJ2QvygoBJKSOnUgXIRA)! Once the video is released I will link it directly here. For now pleaase like and subscribe to Phil so you can stay up to date on this project and many other cool retro computing things!
+This project will also be featured on video on [PhilsComputerLab](https://www.youtube.com/channel/UCj9IJ2QvygoBJKSOnUgXIRA)!
+Here is his [first video](https://www.youtube.com/watch?v=Is3ULD0ZXnI).
+Please like and subscribe to Phil so you can stay up to date on this project and many other cool retro computing things!
 
 ## Donations
 
