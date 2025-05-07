@@ -58,40 +58,194 @@ def getMyIPAddress():
             updateEvent = 1
         myIPAddress = ipAddressAttempt
 
+### Begining of Web Interface ###
+
 app = Flask(__name__)
+
+# HTML template with CSS styling embedded - all curly braces properly escaped
+HTML_LAYOUT = """<!DOCTYPE html>
+<html>
+<head>
+    <title>USBODE - USB Optical Drive Emulator</title>
+    <style>
+        body {{background-color: #EAEAEA; color: #333333; font-family: "Times New Roman", serif; margin: 0; padding: 0;}}
+        h1, h2, h3 {{color: #1E4D8C;}}
+        a {{color: #0066CC;}}
+        a:visited {{color: #0066CC;}}
+        .container {{width: 100%; margin: 0; padding: 0;}}
+        .header {{background-color: #3A7CA5; padding: 10px; text-align: center; color: #FFFFFF;}}
+        .header h1, .header h2 {{color: #FFFFFF; margin: 5px 0;}}
+        .content {{padding: 10px; background-color: #FFFFFF; min-height: 300px;}}
+        .footer {{background-color: #3A7CA5; padding: 10px; text-align: center; color: #FFFFFF;}}
+        .button {{background-color: #4CAF50; padding: 7px 15px; text-decoration: none; color: #FFFFFF; margin: 5px; display: inline-block;}}
+        .info-box {{background-color: #F5F5F5; padding: 10px; margin: 10px 0;}}
+        .warning {{background-color: #FFDDDD; padding: 10px; margin: 10px 0; color: #990000;}}
+        .file-link {{padding: 8px; margin: 5px 0; display: block; font-size: 16px;}}
+        .file-link-even {{background-color: #E3F2FD;}}
+        .file-link-odd {{background-color: #BBDEFB;}}
+        .header-bar {{background-color: #2C5F7C; color: #FFFFFF; padding: 5px;}}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>USBODE</h1>
+            <h2>USB Optical Drive Emulator</h2>
+        </div>
+        <div class="content">
+            {content}
+        </div>
+        <div class="footer">
+            <p>Version {version}</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
 @app.route('/')
 def index():
-    return f"Welcome to USBODE, the USB Optical Drive Emulator!<br> My IP address is {myIPAddress}. <br>To switch modes click here: <a href='/switch'>/switch</a> <br> Currently Serving: {getMountedCDName()}. <br> Current Mode is: {checkState()} <br> <a href='/list'>Load Another Image</a><br><br>Version Number {versionNum}<br><br><a href='/shutdown'>Shutdown the pi</a>"
+    mode = checkState()
+    mode_text = "(CD-Emulator)" if mode == 1 else "(ExFAT mode)" if mode == 2 else ""
+    
+    content = f"""
+    <h3>Welcome to USBODE</h3>
+    <div class="info-box">
+        <p>My IP address is: {myIPAddress}</p>
+        <p>Currently Serving: <strong>{getMountedCDName()}</strong></p>
+        <p>Current Mode is: <strong>{mode} {mode_text}</strong></p>
+    </div>
+    
+    <div>
+        <a class="button" href="/switch">Switch Modes</a>
+        <a class="button" href="/list">Load Another Image</a>
+        <a class="button" href="/shutdown">Shutdown the Pi</a>
+    </div>
+    """
+    
+    return HTML_LAYOUT.format(content=content, version=versionNum)
+
 @app.route('/switch')  
-def switch():
+def switch_mode():
     switch()
-    return f'Switching mode... Current mode is {checkState()} (1=CD-Emulator, 2=ExFAT mode)<br><br><a href="/switch">Need to switch modes again?</a><br><br> <a href="/">Return to USBODE homepage</a>'
+    mode = checkState()
+    mode_text = "(CD-Emulator)" if mode == 1 else "(ExFAT mode)" if mode == 2 else ""
+    
+    content = f"""
+    <h3>Switching Mode</h3>
+    <div class="info-box">
+        <p>Switching mode complete.</p>
+        <p>Current mode is <strong>{mode} {mode_text}</strong></p>
+    </div>
+    
+    <div>
+        <a class="button" href="/switch">Switch Modes Again</a>
+        <a class="button" href="/">Return to Homepage</a>
+    </div>
+    """
+    
+    return HTML_LAYOUT.format(content=content, version=versionNum)
+
 @app.route('/list')
 def listFiles():
-    fileList=list_images()
-    response=""
-    if {checkState() == 2}:
-        response+="The USBODE cannot scan the files in ExFAT mode. <a href='/switch'>Switch Modes</a>, then go back to this page.<br><br>"
-    for file in fileList:
-        response+=f"<a href='/mount/{urllib.parse.quote_plus(file)}'>{file}</a><br><br>"
-    return f"Current File Loaded: {getMountedCDName()}<br><br>To load a different ISO, select it. No disconnection between the OS and the USBODE will occur.<br><br> {response} <br> <a href='/'>Return to USBODE homepage</a>"
+    fileList = list_images()
+    is_exfat = (checkState() == 2)
+    
+    content = f"""
+    <h3>File Selection</h3>
+    <div class="info-box">
+        <p>Current File Loaded: <strong>{getMountedCDName()}</strong></p>
+        <p>To load a different ISO, select it. No disconnection between the OS and the USBODE will occur.</p>
+    </div>
+    """
+    
+    if is_exfat:
+        content += """
+        <div class="warning">
+            <p><strong>The USBODE cannot scan the files in ExFAT mode.</strong></p>
+            <p><a class="button" href="/switch">Switch Modes</a> then return to this page.</p>
+        </div>
+        """
+    else:
+        content += "<h4>Available Files:</h4>"
+        # Add alternating colors to the file list
+        for i, file in enumerate(fileList):
+            encoded_file = urllib.parse.quote_plus(file)
+            row_class = "file-link-even" if i % 2 == 0 else "file-link-odd"
+            content += f'<div class="file-link {row_class}"><a href="/mount/{encoded_file}">{file}</a></div>'
+    
+    content += """
+    <div>
+        <a class="button" href="/">Return to Homepage</a>
+    </div>
+    """
+    
+    return HTML_LAYOUT.format(content=content, version=versionNum)
+
 @app.route('/cdemu')
 def mountCDEMU():
     change_Loaded_Mount(f"{cdemu_cdrom}")
-    return f"Attempting to mount CDEMU CDROM (must already be mounted)...<br> <a href='/'>Return to USBODE homepage</a>"
+    
+    content = f"""
+    <h3>Mounting File</h3>
+    <div class="info-box">
+        <p>Attempting to mount: <strong>CDEMU CDROM</strong></p>
+    </div>
+    
+    <div>
+        <a class="button" href="/">Return to Homepage</a>
+        <a class="button" href="/list">Select Another File</a>
+    </div>
+    """
+    
+    return HTML_LAYOUT.format(content=content, version=versionNum)
+
 @app.route('/mount/<file>')
 def mountFile(file):
-    change_Loaded_Mount(f"{store_mnt}/{urllib.parse.unquote_plus(file)}")
-    return f"Attempting to mount {file}...<br> <a href='/'>Return to USBODE homepage</a>"
+    decoded_file = urllib.parse.unquote_plus(file)
+    change_Loaded_Mount(f"{store_mnt}/{decoded_file}")
+    
+    content = f"""
+    <h3>Mounting File</h3>
+    <div class="info-box">
+        <p>Attempting to mount: <strong>{decoded_file}</strong></p>
+    </div>
+    
+    <div>
+        <a class="button" href="/">Return to Homepage</a>
+        <a class="button" href="/list">Select Another File</a>
+    </div>
+    """
+    
+    return HTML_LAYOUT.format(content=content, version=versionNum)
+
 @app.route('/shutdown')
 def shutdown():
     start_shutdown()
-    return f"Shutting down the pi now"
+    
+    content = """
+    <h3>System Shutdown</h3>
+    <div class="warning">
+        <p>Shutting down the Pi now...</p>
+    </div>
+    """
+    
+    return HTML_LAYOUT.format(content=content, version=versionNum)
+
 @app.route('/exit')
 def exit():
     start_exit()
     Thread.is_alive == 0
-    return f"Exiting the app now"
+    
+    content = """
+    <h3>Application Exit</h3>
+    <div class="warning">
+        <p>Exiting the application now...</p>
+    </div>
+    """
+    
+    return HTML_LAYOUT.format(content=content, version=versionNum)
+### END OF WEB INTERFACE ###
 
 def getMountedCDName():
     if not os.path.exists(gadgetCDFolder+"/functions/mass_storage.usb0/lun.0/file"):
@@ -108,7 +262,7 @@ def list_images():
     print(f"Listing images in {store_mnt}...")
     dir_list=os.listdir(store_mnt)
     for file in dir_list:
-        if file.lower().endswith(".iso") and not (file.startswith("._")):
+        if (file.lower().endswith(".iso") or file.lower().endswith("cue")) and not (file.startswith("._")):
             fileList.append(file)
             print(file)
     fileListSorted=sorted(fileList, key=str.lower)
@@ -201,7 +355,7 @@ def change_Loaded_Mount(filename):
     #Save the ISO filename to to persistent storage
     if checkState() == 1:
         subprocess.run(['sh', 'scripts/force_eject_iso.sh', gadgetCDFolder], cwd="/opt/usbode")
-    if filename.endswith(".iso"): 
+    if filename.endswith(".iso") or filename.endswith(".cue"): 
         f = open(iso_mount_file, "w")
         f.write(f"{filename}" + "\n")
         f.close()
