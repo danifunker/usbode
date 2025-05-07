@@ -159,20 +159,12 @@ def listFiles():
     </div>
     """
     
-    if is_exfat:
-        content += """
-        <div class="warning">
-            <p><strong>The USBODE cannot scan the files in ExFAT mode.</strong></p>
-            <p><a class="button" href="/switch">Switch Modes</a> then return to this page.</p>
-        </div>
-        """
-    else:
-        content += "<h4>Available Files:</h4>"
-        # Add alternating colors to the file list
-        for i, file in enumerate(fileList):
-            encoded_file = urllib.parse.quote_plus(file)
-            row_class = "file-link-even" if i % 2 == 0 else "file-link-odd"
-            content += f'<div class="file-link {row_class}"><a href="/mount/{encoded_file}">{file}</a></div>'
+    content += "<h4>Available Files:</h4>"
+    # Add alternating colors to the file list
+    for i, file in enumerate(fileList):
+        encoded_file = urllib.parse.quote_plus(file)
+        row_class = "file-link-even" if i % 2 == 0 else "file-link-odd"
+        content += f'<div class="file-link {row_class}"><a href="/mount/{encoded_file}">{file}</a></div>'
     
     content += """
     <div>
