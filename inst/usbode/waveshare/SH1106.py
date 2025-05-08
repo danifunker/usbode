@@ -21,11 +21,12 @@ class SH1106(object):
             Device_SPI = config.Device_SPI
             Device_I2C = config.Device_I2C
 
-        else:
-            import configi2c as config
-            Device_SPI = config.Device_SPI
-            Device_I2C = config.Device_I2C
-            self.RPI = config.RaspberryPi()
+        #else:
+        #    import configi2c as config
+        #    Device_SPI = config.Device_SPI
+        #    Device_I2C = config.Device_I2C
+        #    self.RPI = config.RaspberryPi()
+	# Disabling support for i2c, as it may be conflicting with Codec Zero
  
         self._dc = self.RPI.GPIO_DC_PIN
         self._rst = self.RPI.GPIO_RST_PIN
