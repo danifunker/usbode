@@ -390,6 +390,9 @@ def start_flask():
 def changeISO_OLED(disp):
     file_list=list_images()
     iterator = 0
+    last_refresh = 0
+    refresh_rate = 0.15  # seconds between refreshes
+    
     if len(file_list) < 1:
         print("No images found in store, throwing error on screen.")
         disp.clear()
@@ -403,56 +406,85 @@ def changeISO_OLED(disp):
     else:
         updateDisplay_FileS(disp, iterator, file_list)
         while True:
-            time.sleep(0.15)
-            if disp.RPI.digital_read(disp.RPI.GPIO_KEY_UP_PIN ) == 0:
-                pass
-            else:
-                iterator = iterator - 1
-                if iterator < 0:
-                    iterator = len(file_list)-1
-                updateDisplay_FileS(disp, iterator, file_list)
-                print("Going up")
-            if disp.RPI.digital_read(disp.RPI.GPIO_KEY_LEFT_PIN) == 0:
-                pass
-            else:
-                print("left")
-            if disp.RPI.digital_read(disp.RPI.GPIO_KEY_RIGHT_PIN) == 0:
-                pass
-            else:
-                print("right")
-            if disp.RPI.digital_read(disp.RPI.GPIO_KEY_DOWN_PIN) == 0:
-                pass
-            else: 
-                iterator = iterator + 1
-                if iterator > len(file_list)-1:
-                    iterator = 0
-                updateDisplay_FileS(disp, iterator, file_list)
-                print (f"Selected {file_list[iterator]}")
-            if disp.RPI.digital_read(disp.RPI.GPIO_KEY1_PIN) == 0: # button is released
-                pass
-            else: # button is pressed:
-                print(f"loading {store_mnt}/{file_list[iterator]}")
-                requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
-                return True
-            if disp.RPI.digital_read(disp.RPI.GPIO_KEY_PRESS_PIN) == 0: 
-                pass
-            else:
-                print(f"loading {store_mnt}/{file_list[iterator]}")
-                requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
-                return True
-            if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0:
-                pass
-            else: 
-                print("CANCEL") 
-                return True
+            current_time = time.time()
+            
+            # Only check buttons at refresh rate, but always update display for scrolling
+            if current_time - last_refresh >= refresh_rate:
+                last_refresh = current_time
+                
+                # Handle button presses (existing code)
+                if disp.RPI.digital_read(disp.RPI.GPIO_KEY_UP_PIN) == 0:
+                    pass
+                else:
+                    iterator = iterator - 1
+                    if iterator < 0:
+                        iterator = len(file_list)-1
+                    print("Going up")
+                
+                if disp.RPI.digital_read(disp.RPI.GPIO_KEY_DOWN_PIN) == 0:
+                    pass
+                else: 
+                    iterator = iterator + 1
+                    if iterator > len(file_list)-1:
+                        iterator = 0
+                    print(f"Selected {file_list[iterator]}")
+                
+                # Other button checks (left, right, etc.)
+                # ...existing button code...
+                
+                if disp.RPI.digital_read(disp.RPI.GPIO_KEY1_PIN) == 0:
+                    pass
+                else: 
+                    print(f"loading {store_mnt}/{file_list[iterator]}")
+                    requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
+                    return True
+                
+                if disp.RPI.digital_read(disp.RPI.GPIO_KEY_PRESS_PIN) == 0:
+                    pass
+                else:
+                    print(f"loading {store_mnt}/{file_list[iterator]}")
+                    requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
+                    return True
+                
+                if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0:
+                    pass
+                else: 
+                    print("CANCEL") 
+                    return True
+            
+            # Always update the display for smooth scrolling
+            updateDisplay_FileS(disp, iterator, file_list)
+            time.sleep(0.05)  # Short sleep for smooth scrolling
 
 def updateDisplay_FileS(disp, iterator, file_list):
     image1 = Image.new('1', (disp.width, disp.height), "WHITE")
     draw = ImageDraw.Draw(image1)
-    draw.text((0, 0), "Select an ISO:", font = fontL, fill = 0 )
-    draw.text((0, 12), "I: " + str.replace(getMountedCDName(),store_mnt+'/',''), font = fontL, fill = 0 )
-    draw.text((1,25), file_list[iterator], font = fontL, fill = 0 )
-    draw.line([(0,37),(127,37)], fill = 0)
+    
+    # Draw the header
+    draw.text((0, 0), "Select an ISO:", font=fontL, fill=0)
+    
+    # Show currently mounted ISO with potential scrolling if needed
+    current_iso = str.replace(getMountedCDName(), store_mnt+'/', '')
+    if len(current_iso) > 20:  # Only show first 20 chars with ellipsis to save space
+        current_iso = current_iso[:17] + "..."
+    draw.text((0, 12), "I: " + current_iso, font=fontL, fill=0)
+    
+    # Create marquee effect for the selected filename
+    selected_file = file_list[iterator]
+    text, offset, is_scrolling = draw_scrolling_text(
+        disp, selected_file, fontL, 1, 25, fill=0, 
+        max_width=disp.width-2,  # Leave 1px margin on each side
+        scroll_delay=3,  # Adjust for scrolling speed
+        pause_frames=30  # Adjust for how long to pause at start
+    )
+    
+    # Draw the scrolling or static text
+    draw.text((1 + offset, 25), text, font=fontL, fill=0)
+    
+    # Draw separator line
+    draw.line([(0, 37), (127, 37)], fill=0)
+    
+    # Show the image
     disp.ShowImage(disp.getbuffer(image1))
 
 def updateDisplay(disp):
@@ -526,6 +558,43 @@ def stopPiOled():
     exitRequested = 1
     print("Stopping OLED")
     disp.RPI.module_exit()
+
+def draw_scrolling_text(disp, text, font, x, y, fill=0, max_width=127, scroll_delay=3, pause_frames=20):
+    """
+    Draw scrolling text (marquee) if text width exceeds max_width
+    
+    Args:
+        disp: Display object
+        text: Text to display
+        font: Font to use
+        x, y: Starting position
+        fill: Color (0 for black)
+        max_width: Maximum width before scrolling
+        scroll_delay: Frames between scroll positions (higher = slower)
+        pause_frames: How many frames to wait before scrolling starts
+    """
+    # Calculate text width
+    dummy_img = Image.new('1', (1, 1), "WHITE")
+    dummy_draw = ImageDraw.Draw(dummy_img)
+    text_width, _ = dummy_draw.textsize(text, font=font)
+    
+    # If text fits, just draw it normally
+    if text_width <= max_width:
+        return text, 0, False
+    
+    # Calculate scroll position
+    current_time = int(time.time() * 2)  # Use time for animation
+    
+    # Don't scroll for the first few frames (pause at beginning)
+    if current_time % (text_width + pause_frames) < pause_frames:
+        offset = 0
+    else:
+        # Calculate scroll position based on time
+        offset = ((current_time // scroll_delay) % (text_width + max_width)) - max_width
+        if offset > 0:
+            offset = 0
+    
+    return text, offset, True
 
 def main():
     #Setup Environment
