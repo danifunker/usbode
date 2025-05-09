@@ -390,8 +390,8 @@ def start_flask():
 def changeISO_OLED(disp):
     file_list=list_images()
     iterator = 0
-    last_refresh = 0
-    refresh_rate = 0.15  # seconds between refreshes
+    last_button_check = 0
+    button_check_interval = 0.15  # Only check buttons every 150ms
     
     if len(file_list) < 1:
         print("No images found in store, throwing error on screen.")
@@ -408,11 +408,14 @@ def changeISO_OLED(disp):
         while True:
             current_time = time.time()
             
-            # Only check buttons at refresh rate, but always update display for scrolling
-            if current_time - last_refresh >= refresh_rate:
-                last_refresh = current_time
+            # Always update the display for smooth scrolling
+            updateDisplay_FileS(disp, iterator, file_list)
+            
+            # Only check buttons periodically
+            if current_time - last_button_check >= button_check_interval:
+                last_button_check = current_time
                 
-                # Handle button presses (existing code)
+                # Button handling (unchanged)
                 if disp.RPI.digital_read(disp.RPI.GPIO_KEY_UP_PIN) == 0:
                     pass
                 else:
@@ -429,21 +432,19 @@ def changeISO_OLED(disp):
                         iterator = 0
                     print(f"Selected {file_list[iterator]}")
                 
-                # Other button checks (left, right, etc.)
-                # ...existing button code...
-                
+                # Other button checks - unchanged
                 if disp.RPI.digital_read(disp.RPI.GPIO_KEY1_PIN) == 0:
                     pass
                 else: 
                     print(f"loading {store_mnt}/{file_list[iterator]}")
-                    requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
+                    requests.request('GET', f'http://127.0.0.1/mount/{urllib.parse.quote_plus(file_list[iterator])}')
                     return True
                 
                 if disp.RPI.digital_read(disp.RPI.GPIO_KEY_PRESS_PIN) == 0:
                     pass
                 else:
                     print(f"loading {store_mnt}/{file_list[iterator]}")
-                    requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
+                    requests.request('GET', f'http://127.0.0.1/mount/{urllib.parse.quote_plus(file_list[iterator])}')
                     return True
                 
                 if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0:
@@ -452,9 +453,8 @@ def changeISO_OLED(disp):
                     print("CANCEL") 
                     return True
             
-            # Always update the display for smooth scrolling
-            updateDisplay_FileS(disp, iterator, file_list)
-            time.sleep(0.05)  # Short sleep for smooth scrolling
+            # Very short sleep to prevent CPU hogging while maintaining smooth scrolling
+            time.sleep(0.02)
 
 def updateDisplay_FileS(disp, iterator, file_list):
     image1 = Image.new('1', (disp.width, disp.height), "WHITE")
@@ -463,23 +463,28 @@ def updateDisplay_FileS(disp, iterator, file_list):
     # Draw the header
     draw.text((0, 0), "Select an ISO:", font=fontL, fill=0)
     
-    # Show currently mounted ISO with potential scrolling if needed
+    # Show currently mounted ISO with truncation if needed
     current_iso = str.replace(getMountedCDName(), store_mnt+'/', '')
-    if len(current_iso) > 20:  # Only show first 20 chars with ellipsis to save space
-        current_iso = current_iso[:17] + "..."
+    if len(current_iso) > 19:  # Adjusted for large font (19 chars)
+        current_iso = current_iso[:16] + "..."
     draw.text((0, 12), "I: " + current_iso, font=fontL, fill=0)
     
     # Create marquee effect for the selected filename
     selected_file = file_list[iterator]
+    
+    # Add highlight for selected file
+    draw.rectangle([(0, 24), (disp.width, 36)], fill=0)
+    
+    # Get scrolling text with improved parameters
     text, offset, is_scrolling = draw_scrolling_text(
-        disp, selected_file, fontL, 1, 25, fill=0, 
-        max_width=disp.width-2,  # Leave 1px margin on each side
-        scroll_delay=3,  # Adjust for scrolling speed
-        pause_frames=30  # Adjust for how long to pause at start
+        disp, selected_file, fontL, 1, 25, fill=1,  # White text on black background
+        max_width=126,  # Full display width
+        scroll_delay=1,  # Fast scroll
+        pause_frames=30  # 3 seconds pause
     )
     
-    # Draw the scrolling or static text
-    draw.text((1 + offset, 25), text, font=fontL, fill=0)
+    # Draw the scrolling text in white on black background
+    draw.text((1 + offset, 25), text, font=fontL, fill=1)
     
     # Draw separator line
     draw.line([(0, 37), (127, 37)], fill=0)
@@ -490,10 +495,22 @@ def updateDisplay_FileS(disp, iterator, file_list):
 def updateDisplay(disp):
     image1 = Image.new('1', (disp.width, disp.height), "WHITE")
     draw = ImageDraw.Draw(image1)
-    draw.text((0, 0), "USBODE v:" + versionNum, font = fontL, fill = 0 )
-    draw.text((0, 12), "IP: " + myIPAddress, font = fontL, fill = 0 )
-    draw.text((0, 24), "ISO: " + str.replace(getMountedCDName(),store_mnt+'/',''), font = fontL, fill = 0 )
-    draw.text((0, 36), "Mode: " + str(checkState()), font = fontL, fill = 0 )
+    draw.text((0, 0), "USBODE v:" + versionNum, font = fontL, fill = 0)
+    draw.text((0, 12), "IP: " + myIPAddress, font = fontL, fill = 0)
+    
+    # Get the ISO name and apply scrolling if needed
+    iso_name = str.replace(getMountedCDName(), store_mnt+'/', '')
+    iso_text, iso_offset, iso_scrolling = draw_scrolling_text(
+        disp, iso_name, fontL, 0, 24, fill=0,
+        max_width=120,  # Slightly shorter than screen width to account for "ISO: " text
+        scroll_delay=1,  # Fast scrolling
+        pause_frames=30  # 3 seconds pause at current speed
+    )
+    
+    # Draw the ISO name with scrolling
+    draw.text((0 + iso_offset, 24), "ISO: " + iso_text, font = fontL, fill = 0)
+    
+    draw.text((0, 36), "Mode: " + str(checkState()), font = fontL, fill = 0)
     disp.ShowImage(disp.getbuffer(image1))
 
 def updateDisplay_Advanced(disp):
@@ -526,31 +543,45 @@ def getOLEDinput():
     updateDisplay(disp)
     global exitRequested
     global myIPAddress
+    last_refresh = time.time()
+    refresh_interval = 0.05  # Update screen more frequently for smooth scrolling
+    
     while exitRequested == 0:
-        #Scan for IP address changes and update the screen if found
-        global updateEvent
-        time.sleep(0.15)
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY3_PIN) == 0: # button is released
+        current_time = time.time()
+        
+        # Update screen at a higher frequency for smooth scrolling
+        if current_time - last_refresh >= refresh_interval:
+            updateDisplay(disp)
+            last_refresh = current_time
+        
+        # Check buttons less frequently
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY3_PIN) == 0:
             pass
-        else: # button is pressed:
+        else:
             print("Changing MODE")
             switch()
             updateDisplay(disp)
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0: # button is released
+            
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0:
             pass
-        else: # button is pressed:
+        else:
             print("ADVANCED MENU")
             updateDisplay_Advanced(disp)
             updateDisplay(disp)
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY1_PIN) == 0: # button is released
+            
+        if disp.RPI.digital_read(disp.RPI.GPIO_KEY1_PIN) == 0:
             pass
-        else: # button is pressed:
+        else:
             print("OK")
             changeISO_OLED(disp)
             updateDisplay(disp)
+            
         if updateEvent == 1:
             updateDisplay(disp)
             updateEvent = 0
+            
+        # Short sleep to prevent CPU hogging
+        time.sleep(0.02)
 
 def stopPiOled():
     global disp
@@ -559,7 +590,7 @@ def stopPiOled():
     print("Stopping OLED")
     disp.RPI.module_exit()
 
-def draw_scrolling_text(disp, text, font, x, y, fill=0, max_width=127, scroll_delay=3, pause_frames=20):
+def draw_scrolling_text(disp, text, font, x, y, fill=0, max_width=127, scroll_delay=1, pause_frames=20):
     """
     Draw scrolling text (marquee) if text width exceeds max_width
     
@@ -573,26 +604,36 @@ def draw_scrolling_text(disp, text, font, x, y, fill=0, max_width=127, scroll_de
         scroll_delay: Frames between scroll positions (higher = slower)
         pause_frames: How many frames to wait before scrolling starts
     """
-    # Calculate text width
-    dummy_img = Image.new('1', (1, 1), "WHITE")
-    dummy_draw = ImageDraw.Draw(dummy_img)
-    text_width, _ = dummy_draw.textsize(text, font=font)
+    # If text is shorter than max visible chars based on font size, don't scroll
+    max_chars = 19 if font == fontL else 21
     
-    # If text fits, just draw it normally
-    if text_width <= max_width:
+    if len(text) <= max_chars:
         return text, 0, False
     
-    # Calculate scroll position
-    current_time = int(time.time() * 2)  # Use time for animation
+    # For longer text, implement scrolling with simplified logic
+    # Use milliseconds for smoother animation
+    current_time = int(time.time() * 10)  # Use higher multiplier for smoother animation
     
-    # Don't scroll for the first few frames (pause at beginning)
-    if current_time % (text_width + pause_frames) < pause_frames:
+    # Simplified scroll logic:
+    # 1. Pause at beginning (showing start of text)
+    # 2. Scroll through text at constant speed
+    # 3. Pause at end
+    # 4. Jump back to beginning
+    
+    # Calculate full cycle length
+    cycle_length = 2 * pause_frames + len(text) * 10  # Length of entire animation cycle
+    position = current_time % cycle_length
+    
+    if position < pause_frames:
+        # Initial pause - show beginning
         offset = 0
+    elif position < pause_frames + len(text) * 10:
+        # Scrolling phase - move text to the left
+        scroll_pos = (position - pause_frames) // scroll_delay
+        offset = -scroll_pos
     else:
-        # Calculate scroll position based on time
-        offset = ((current_time // scroll_delay) % (text_width + max_width)) - max_width
-        if offset > 0:
-            offset = 0
+        # End pause - show beginning again
+        offset = 0
     
     return text, offset, True
 
