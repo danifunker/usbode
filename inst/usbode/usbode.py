@@ -20,7 +20,7 @@ import subprocess
 import requests
 from gpiozero import *
 from pathlib import Path
-from threading import Thread
+from threading import Thread, Lock
 import time
 import urllib.parse
 from flask import Flask
@@ -37,6 +37,9 @@ updateEvent = 0
 global exitRequested
 exitRequested = 0
 
+# First, add a lock to protect the updateEvent variable
+update_lock = Lock()
+
 def version():
     print("USBODE - Turn your Pi Zero/Zero 2 into one a virtual USB CD-ROM drive")
     print("Web Functionality and massive rewrite Danifunker: https://github.com/danifunker/usbode\n")
@@ -47,16 +50,20 @@ myIPAddress = "Unable to determine IP address"
 
 def getMyIPAddress():
     while True:
-        global myIPAddress
+        global myIPAddress, updateEvent
         time.sleep(1)
         try:
             ipAddressAttempt = subprocess.check_output(['hostname', '-I']).decode('utf-8').strip().split(' ')[0]
         except:
             ipAddressAttempt = "Unable to determine IP address"
+        
         if ipAddressAttempt != myIPAddress:
-            global updateEvent
-            updateEvent = 1
-        myIPAddress = ipAddressAttempt
+            print(f"IP address changed from {myIPAddress} to {ipAddressAttempt}")
+            myIPAddress = ipAddressAttempt
+            
+            # Use the lock to safely set the update event
+            with update_lock:
+                updateEvent = 1
 
 ### Begining of Web Interface ###
 
@@ -388,63 +395,71 @@ def start_flask():
     app.run(host='::', port=80)
 
 def changeISO_OLED(disp):
-    file_list=list_images()
+    file_list = list_images()
     iterator = 0
+    
     if len(file_list) < 1:
         print("No images found in store, throwing error on screen.")
         disp.clear()
         image1 = Image.new('1', (disp.width, disp.height), "WHITE")
         draw = ImageDraw.Draw(image1)
-        draw.text((0, 0), "No Images in store.", font = fontL, fill = 0 )
-        draw.text((0, 14), "Please add an image first.", font = fontL, fill = 0 )
+        draw.text((0, 0), "No Images in store.", font=fontL, fill=0)
+        draw.text((0, 14), "Please add an image first.", font=fontL, fill=0)
         disp.ShowImage(disp.getbuffer(image1))
-        time.sleep(0.15)
+        time.sleep(1.0)  # Show error for a second
         return False
-    else:
-        updateDisplay_FileS(disp, iterator, file_list)
-        while True:
-            time.sleep(0.15)
-            if disp.RPI.digital_read(disp.RPI.GPIO_KEY_UP_PIN ) == 0:
-                pass
-            else:
-                iterator = iterator - 1
-                if iterator < 0:
-                    iterator = len(file_list)-1
-                updateDisplay_FileS(disp, iterator, file_list)
-                print("Going up")
-            if disp.RPI.digital_read(disp.RPI.GPIO_KEY_LEFT_PIN) == 0:
-                pass
-            else:
-                print("left")
-            if disp.RPI.digital_read(disp.RPI.GPIO_KEY_RIGHT_PIN) == 0:
-                pass
-            else:
-                print("right")
-            if disp.RPI.digital_read(disp.RPI.GPIO_KEY_DOWN_PIN) == 0:
-                pass
-            else: 
-                iterator = iterator + 1
-                if iterator > len(file_list)-1:
-                    iterator = 0
-                updateDisplay_FileS(disp, iterator, file_list)
-                print (f"Selected {file_list[iterator]}")
-            if disp.RPI.digital_read(disp.RPI.GPIO_KEY1_PIN) == 0: # button is released
-                pass
-            else: # button is pressed:
-                print(f"loading {store_mnt}/{file_list[iterator]}")
-                requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
-                return True
-            if disp.RPI.digital_read(disp.RPI.GPIO_KEY_PRESS_PIN) == 0: 
-                pass
-            else:
-                print(f"loading {store_mnt}/{file_list[iterator]}")
-                requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
-                return True
-            if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0:
-                pass
-            else: 
-                print("CANCEL") 
-                return True
+        
+    # Button pins to monitor
+    button_pins = [
+        disp.RPI.GPIO_KEY_UP_PIN,
+        disp.RPI.GPIO_KEY_DOWN_PIN,
+        disp.RPI.GPIO_KEY1_PIN,
+        disp.RPI.GPIO_KEY_PRESS_PIN,
+        disp.RPI.GPIO_KEY2_PIN
+    ]
+    
+    # Button state tracking for debouncing
+    last_button_states = {pin: 1 for pin in button_pins}
+    debounce_time = 0.2  # seconds
+    last_press_time = {pin: 0 for pin in button_pins}
+    
+    updateDisplay_FileS(disp, iterator, file_list)
+    
+    while True:
+        current_time = time.time()
+        
+        for i, pin in enumerate(button_pins):
+            current_state = disp.RPI.digital_read(pin)
+            
+            # Button release detected (transition from 0 to 1)
+            if current_state == 1 and last_button_states[pin] == 0:
+                last_button_states[pin] = 1
+                
+                # Check debounce
+                if current_time - last_press_time[pin] > debounce_time:
+                    last_press_time[pin] = current_time
+                    
+                    # Handle button actions
+                    if i == 0:  # Up button
+                        iterator = (iterator - 1) % len(file_list)
+                        updateDisplay_FileS(disp, iterator, file_list)
+                        print("Going up")
+                    elif i == 1:  # Down button
+                        iterator = (iterator + 1) % len(file_list)
+                        updateDisplay_FileS(disp, iterator, file_list)
+                        print(f"Selected {file_list[iterator]}")
+                    elif i == 2 or i == 3:  # OK button or Press button
+                        print(f"loading {store_mnt}/{file_list[iterator]}")
+                        requests.request('GET', f'http://127.0.0.1/mount/{file_list[iterator]}')
+                        return True
+                    elif i == 4:  # Cancel button
+                        print("CANCEL")
+                        return True
+            
+            # Update button state
+            last_button_states[pin] = current_state
+                
+        time.sleep(0.05)  # More responsive polling
 
 def updateDisplay_FileS(disp, iterator, file_list):
     image1 = Image.new('1', (disp.width, disp.height), "WHITE")
@@ -488,37 +503,82 @@ def updateDisplay_Advanced(disp):
             requests.request('GET', f'http://127.0.0.1/shutdown')
        
 def getOLEDinput():
-    global disp
+    global disp, exitRequested, updateEvent
+    
+    # Button pins to monitor
+    button_pins = [
+        disp.RPI.GPIO_KEY3_PIN,  # Mode button
+        disp.RPI.GPIO_KEY2_PIN,  # Advanced menu button
+        disp.RPI.GPIO_KEY1_PIN   # OK button
+    ]
+    
+    # Button state tracking for debouncing
+    last_button_states = {pin: 1 for pin in button_pins}  # 1 = released, 0 = pressed
+    debounce_time = 0.2  # seconds
+    last_press_time = {pin: 0 for pin in button_pins}
+    
+    # Initialize display
     disp.Init()
     disp.clear()
     updateDisplay(disp)
-    global exitRequested
-    global myIPAddress
-    while exitRequested == 0:
-        #Scan for IP address changes and update the screen if found
-        global updateEvent
-        time.sleep(0.15)
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY3_PIN) == 0: # button is released
-            pass
-        else: # button is pressed:
-            print("Changing MODE")
-            switch()
+    
+    # Track last update time to periodically check status
+    last_update_time = time.time()
+    update_interval = 5  # Check for updates every 5 seconds
+    
+    while not exitRequested:
+        current_time = time.time()
+        
+        # Check button states
+        for i, pin in enumerate(button_pins):
+            current_state = disp.RPI.digital_read(pin)
+            
+            # Button press detected (transition from 1 to 0)
+            if current_state == 0 and last_button_states[pin] == 1:
+                last_button_states[pin] = 0
+                
+            # Button release detected (transition from 0 to 1)
+            elif current_state == 1 and last_button_states[pin] == 0:
+                last_button_states[pin] = 1
+                
+                # Check debounce
+                if current_time - last_press_time[pin] > debounce_time:
+                    last_press_time[pin] = current_time
+                    
+                    # Handle button actions
+                    if i == 0:  # Mode button
+                        print("Changing MODE")
+                        switch()
+                        updateDisplay(disp)
+                    elif i == 1:  # Advanced menu button
+                        print("ADVANCED MENU")
+                        updateDisplay_Advanced(disp)
+                        updateDisplay(disp)
+                    elif i == 2:  # OK button
+                        print("OK")
+                        changeISO_OLED(disp)
+                        updateDisplay(disp)
+            
+            # Update button state
+            last_button_states[pin] = current_state
+        
+        # Handle display updates separately from button presses
+        should_update = False
+        with update_lock:
+            if updateEvent == 1:
+                updateEvent = 0
+                should_update = True
+        
+        # Check for periodic updates even if no explicit event
+        if current_time - last_update_time > update_interval:
+            last_update_time = current_time
+            should_update = True
+        
+        if should_update:
             updateDisplay(disp)
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY2_PIN) == 0: # button is released
-            pass
-        else: # button is pressed:
-            print("ADVANCED MENU")
-            updateDisplay_Advanced(disp)
-            updateDisplay(disp)
-        if disp.RPI.digital_read(disp.RPI.GPIO_KEY1_PIN) == 0: # button is released
-            pass
-        else: # button is pressed:
-            print("OK")
-            changeISO_OLED(disp)
-            updateDisplay(disp)
-        if updateEvent == 1:
-            updateDisplay(disp)
-            updateEvent = 0
+            
+        # More efficient sleep that doesn't block too long
+        time.sleep(0.05)
 
 def stopPiOled():
     global disp
