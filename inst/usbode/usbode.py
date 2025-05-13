@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 import sys
 import os
+import logging
+import datetime
+from logging.handlers import RotatingFileHandler
+
 ScriptPath=os.path.dirname(__file__)
 sys.path.append(f"{ScriptPath}/waveshare")
 global oledEnabled
@@ -40,10 +44,48 @@ exitRequested = 0
 # First, add a lock to protect the updateEvent variable
 update_lock = Lock()
 
+# Add this near the top of your file after other imports
+def setup_logging():
+    """Configure logging to both console and file"""
+    log_file = '/boot/firmware/usbode-logs.txt'
+    
+    # Create logger
+    logger = logging.getLogger('usbode')
+    logger.setLevel(logging.INFO)
+    
+    # Create formatter
+    log_format = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    
+    # Create console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(log_format)
+    logger.addHandler(console_handler)
+    
+    try:
+        # Create rotating file handler (10 MB max size, keep 3 backup files)
+        file_handler = RotatingFileHandler(
+            log_file, 
+            maxBytes=10*1024*1024,  # 10 MB
+            backupCount=3
+        )
+        file_handler.setFormatter(log_format)
+        logger.addHandler(file_handler)
+        
+        # Log a startup message
+        logger.info(f"=== USBODE v{versionNum} started at {datetime.datetime.now().isoformat()} ===")
+    except Exception as e:
+        # If we can't write to the log file, log to console only
+        logger.error(f"Failed to set up file logging to {log_file}: {e}")
+    
+    return logger
+
+# Add this line after your imports but before any function definitions
+logger = setup_logging()
+
 def version():
-    print("USBODE - Turn your Pi Zero/Zero 2 into one a virtual USB CD-ROM drive")
-    print("Web Functionality and massive rewrite Danifunker: https://github.com/danifunker/usbode\n")
-    print(f"USBODE version ${versionNum}")
+    logger.info("USBODE - Turn your Pi Zero/Zero 2 into a virtual USB CD-ROM drive")
+    logger.info("Web Functionality and massive rewrite Danifunker: https://github.com/danifunker/usbode")
+    logger.info(f"USBODE version {versionNum}")
 
 global myIPAddress
 myIPAddress = "Unable to determine IP address"
@@ -54,11 +96,12 @@ def getMyIPAddress():
         time.sleep(1)
         try:
             ipAddressAttempt = subprocess.check_output(['hostname', '-I']).decode('utf-8').strip().split(' ')[0]
-        except:
+        except Exception as e:
             ipAddressAttempt = "Unable to determine IP address"
+            logger.error(f"Failed to get IP address: {e}")
         
         if ipAddressAttempt != myIPAddress:
-            print(f"IP address changed from {myIPAddress} to {ipAddressAttempt}")
+            logger.info(f"IP address changed from {myIPAddress} to {ipAddressAttempt}")
             myIPAddress = ipAddressAttempt
             
             # Use the lock to safely set the update event
@@ -275,25 +318,37 @@ def cleanupMode(gadgetFolder=gadgetCDFolder):
     time.sleep(.25)
 
 def init_gadget(type):
-    print(f"Initializing USBODE {type} gadget through configfs...")
+    logger.info(f"Initializing USBODE {type} gadget through configfs...")
     cleanupMode()
-    os.makedirs(gadgetCDFolder, exist_ok=True)
-    os.makedirs(gadgetCDFolder + "/strings/0x409", exist_ok=True)
-    os.makedirs(gadgetCDFolder +"/configs/c.1/strings/0x409", exist_ok=True)
-    os.makedirs(gadgetCDFolder +"/functions/mass_storage.usb0", exist_ok=True)
-    if type == "cdrom":
-        subprocess.run(['sh', 'scripts/cd_gadget_setup.sh',gadgetCDFolder ], cwd="/opt/usbode")
-        with open(iso_mount_file, "r") as f:
-            iso_filename = f.readline().strip()
-        if iso_filename and os.path.exists(f"{iso_filename}"):
-            change_Loaded_Mount(f"{iso_filename}")
-        else:
-            print(f"The requested file to load {iso_filename} does not exist, kicking into exFAT mode now.")
-            disable_gadget()
-    elif type == "exfat":
-        subprocess.run(['sh', 'scripts/exfat_gadget_setup.sh', gadgetCDFolder], cwd="/opt/usbode")
-        change_Loaded_Mount(f"{store_dev}")
-    enable_gadget()
+    try:
+        os.makedirs(gadgetCDFolder, exist_ok=True)
+        os.makedirs(gadgetCDFolder + "/strings/0x409", exist_ok=True)
+        os.makedirs(gadgetCDFolder +"/configs/c.1/strings/0x409", exist_ok=True)
+        os.makedirs(gadgetCDFolder +"/functions/mass_storage.usb0", exist_ok=True)
+        
+        if type == "cdrom":
+            result = subprocess.run(['sh', 'scripts/cd_gadget_setup.sh', gadgetCDFolder], cwd="/opt/usbode", capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error(f"CDROM gadget setup failed: {result.stderr}")
+            
+            with open(iso_mount_file, "r") as f:
+                iso_filename = f.readline().strip()
+            
+            if iso_filename and os.path.exists(f"{iso_filename}"):
+                change_Loaded_Mount(f"{iso_filename}")
+            else:
+                logger.warning(f"The requested file to load {iso_filename} does not exist, switching to exFAT mode.")
+                disable_gadget()
+                
+        elif type == "exfat":
+            result = subprocess.run(['sh', 'scripts/exfat_gadget_setup.sh', gadgetCDFolder], cwd="/opt/usbode", capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error(f"ExFAT gadget setup failed: {result.stderr}")
+            change_Loaded_Mount(f"{store_dev}")
+            
+        enable_gadget()
+    except Exception as e:
+        logger.exception(f"Failed to initialize {type} gadget: {e}")
 
 def enable_gadget():
     p = subprocess.run(['sh', 'scripts/enablegadget.sh', gadgetCDFolder], cwd="/opt/usbode")
@@ -590,32 +645,51 @@ def stopPiOled():
 def main():
     #Setup Environment
     global exitRequested
-    print("Starting USBODE...")
-    print(f"Mounting image store on {store_mnt}...")
-    subprocess.run(['mount', store_dev, store_mnt, '-o', 'umask=000'])
-    subprocess.run(['modprobe', 'libcomposite'])
-    #Start IP scanning daemon, hopefully to speed up startup
-    daemonIPScanner = Thread(target=getMyIPAddress, daemon=True, name='IP Scanner')
-    daemonIPScanner.start()
-    daemon = Thread(target=start_flask, daemon=True, name='Server')
-    daemon.start()
-    if os.path.exists(iso_mount_file):
-        init_gadget("cdrom")
-    else:
-        init_gadget("exfat")
-    global oledEnabled
-    if oledEnabled:
-        global disp
-        disp = SH1106.SH1106()
-        print("OLED Display Enabled")
-        #Init 1.3" display
-        print("done displaying output")
-        oledDaemon = Thread(target=getOLEDinput, daemon=True, name='OLED')
-        oledDaemon.start()
-    while exitRequested == 0:
-        time.sleep(0.15)
-    start_exit()
-    quit(0)
+    logger.info("Starting USBODE...")
+    logger.info(f"Mounting image store on {store_mnt}...")
+    
+    try:
+        result = subprocess.run(['mount', store_dev, store_mnt, '-o', 'umask=000'], capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.error(f"Failed to mount image store: {result.stderr}")
+        
+        #Append sbin paths for cron install
+        os.environ['PATH'] = f"{os.environ['PATH']}:/sbin:/usr/sbin:/usr/local/sbin"
+        logger.info(f"Path is currently set to: {os.environ['PATH']}")
+        subprocess.run(['modprobe', 'libcomposite'], capture_output=True, text=True)
+        
+        #Start IP scanning daemon, hopefully to speed up startup
+        daemonIPScanner = Thread(target=getMyIPAddress, daemon=True, name='IP Scanner')
+        daemonIPScanner.start()
+        logger.info("IP scanner thread started")
+        
+        daemon = Thread(target=start_flask, daemon=True, name='Server')
+        daemon.start()
+        logger.info("Flask server thread started")
+        
+        if os.path.exists(iso_mount_file):
+            init_gadget("cdrom")
+        else:
+            init_gadget("exfat")
+            
+        global oledEnabled
+        if oledEnabled:
+            global disp
+            disp = SH1106.SH1106()
+            logger.info("OLED Display Enabled")
+            oledDaemon = Thread(target=getOLEDinput, daemon=True, name='OLED')
+            oledDaemon.start()
+            logger.info("OLED thread started")
+            
+        while exitRequested == 0:
+            time.sleep(0.15)
+            
+        start_exit()
+        logger.info("Clean exit completed")
+        quit(0)
+    except Exception as e:
+        logger.exception(f"Fatal error in main thread: {e}")
+        quit(1)
 
 if __name__ == "__main__":
     main()
