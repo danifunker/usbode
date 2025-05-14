@@ -6,14 +6,13 @@ USBODE is a set of scripts that uses the Linux USB Gadget kernel modules to turn
 
 *** This project did support Pi Zero W but this is currently untested as of v1.8. I am using a new custom kernel and am unsure if this works with that model ***
 
-## New Install process (not yet completed)
+## New Install process
 1. **Prepare the SD Card**
--   Using the Pi Imager tool, flash the included image (see releases). This is a customized version of Raspberry Pi OS Lite (bookwork) 32-bit image (original file `2024-11-19-raspios-bookworm-armhf-lite.img.xz`) to an SD Card (32 GB minimum recommended size) 
+-   Using the Pi Imager tool, flash the included image (see releases). This is a customized version of Raspberry Pi OS Lite (bookwork) 32-bit image (original file `2024-11-19-raspios-bookworm-armhf-lite.img.xz`) to an SD Card (32 GB minimum recommended size, 8GB is absolute minimum) 
     -   Use the Pi Imager tool to preconfigure hostname, login and locale
     -   If configuring wifi, remember, Pi Zero W and Zero 2 W models only supports 2.4ghz networks up to Wireless-N standards
 2. Eject the SDCard from the computer when prompted, and re-insert the sdcard.
-3. Copy all the files from the `/inst` folder to the `bootfs` partition on the SDCard. Replace `config.txt` when prompted.
-6. Wait for the auto configure and everything to start, give it a few minutes, once the pi reboots unplug the keyboard from the Pi (the keyboard is incomptaible with USB host mode). If the usbode page gives a 500 error, reboot the pi then try again.
+3. Wait for the auto configure and everything to start, give it a few minutes, once the pi reboots unplug the keyboard from the Pi (the keyboard is incomptaible with USB host mode). If the usbode page gives a 500 error, reboot the pi then try again.
 
 ## First Startup
 If no iso files are found on the sdcard, USBODE will automatically go into "USB Mass Storage" mode, allowing the user to populate the sdcard with ISO files. Once at least one ISO file is on the sdcard in the `imgstore` partition, access the USBODE interface through a web browser on another system, then load an ISO. Once the ISO is loaded, be sure to switch the mode, so it's in mode `1` CD-ROM mode. I am currently looking into some logic to make sure whenever an ISO is loaded, the device stays in CD-ROM mode.
