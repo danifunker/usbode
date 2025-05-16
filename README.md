@@ -1,21 +1,41 @@
 # USBODE
+USBODE allows you to emulate an optical drive on nearly any computer equipped with a working USB port. It's like a Gotek Floppy Emulator, but for CD drives! It uses a Raspberry Pi Zero W or Zero W 2 to do the heavy lifting, and images are stored as .ISO files on a MicroSD card (no .Cue/.Bin support _yet_).
 
-### Turn your Pi Zero W 2 into a virtual USB CD-ROM drive!
+## Requirements:
+1. A Raspberry Pi Zero W or Zero 2 W
+2. A MicroSD card you're willing to format. We suggest a 32 GB card, but you can get away with as little as 8.
+3. A USB cable with male Type A on one side, and male Micro B on the other. Micro B is what most people think of as an ordinary Micro USb cable. This cable needs to be capable of data transfer, not just power.
+4. The latest [USB-ODE Release Image](https://github.com/danifunker/usbode/releases).
+5. The [Raspberry Pi Imager](https://www.raspberrypi.com/software/) application.
+6. A computer with a USB port (if you're using a modern computer to set this up, great. If you're intending to use this on a retro PC, it also needs a USB port).
 
-USBODE is a set of scripts that uses the Linux USB Gadget kernel modules to turn your Raspberry Pi Zero (W) or aspberry Pi Zero 2 (W) into one or more emulated USB CD-ROM drives. This new version utilizes `configfs`.
+## Setting Up USBODE
+(Current as of v1.8; 1.7 and before have a different process)
+1. Open the Pi Imager tool. Under `Choose Device`, select the model of Pi you're using. Under `Choose OS`, select the USB-ODE image you downloaded. Under `Choose Storage`, select your MicroSD card.
+2. Preconfigure your hostname, login info (for SSH), WiFi information, and locale.
+   - Note, the Pi Zero W and Pi Zero W 2 support 2.4 GHz networks up to Wireless N (802.11N). They do not support 5 GHz networks. If your router broadcasts in both modes, input the name that the 2.4 GHz mode uses. It's fine if both modes use the same name.
+2. Once the Pi Imager Tool has completed, it will notify you. You should then eject the card and insert it into your Pi.
+3. Plug the USB cable into the computer you intend to emulate an optical drive on. The Pi has two Micro USB ports, one labled PWR and the other USB. Plug the Micro A end into the one labled USB, _not_ the one labled PWR. After a half-second or so, you should see the Pi's indicator LED flashing randomly, then in a pattern.
+4. The Pi is now performing an initial boot, which can take up to 10 minutes to complete on a first-gen Zero W (subsequent boots will be much faster, and the first boot will be faster if you have a faster SD card and a Zero W 2). Once this process is complete, the Pi will connect to the wifi network you assigned earlier. You should now be able to access the ODE by entering its IP address in a browser.
+   - If you see "The connection has timed out", it is likely still booting. If you see a 500 error, this is usually resolved by rebooting the Pi.
 
-*** This project did support Pi Zero W but this is currently untested as of v1.8. I am using a new custom kernel and am unsure if this works with that model ***
+The setup should now be complete, and you're ready to go. If you have any difficulties, come check out the [Discord](https://discord.gg/na2qNrvdFY).
 
-## New Install process
-1. **Prepare the SD Card**
--   Using the Pi Imager tool, flash the included image (see releases). This is a customized version of Raspberry Pi OS Lite (bookwork) 32-bit image (original file `2024-11-19-raspios-bookworm-armhf-lite.img.xz`) to an SD Card (32 GB minimum recommended size, 8GB is absolute minimum) 
-    -   Use the Pi Imager tool to preconfigure hostname, login and locale
-    -   If configuring wifi, remember, Pi Zero W and Zero 2 W models only supports 2.4ghz networks up to Wireless-N standards
-2. Eject the SDCard from the computer when prompted, and re-insert the sdcard.
-3. Wait for the auto configure and everything to start, give it a few minutes, once the pi reboots unplug the keyboard from the Pi (the keyboard is incomptaible with USB host mode). If the usbode page gives a 500 error, reboot the pi then try again.
+## Using USBODE
+USBODE loads ISO images from the MicroSD card that the Pi boots from. You'll need to put ISO files on that card for your device to see them. While you can transfer files over the network or over the Pi's USB cable, transfer speeds are much faster if you can plug your MicroSD card into a computer.
 
-## First Startup
-If no iso files are found on the sdcard, USBODE will automatically go into "USB Mass Storage" mode, allowing the user to populate the sdcard with ISO files. Once at least one ISO file is on the sdcard in the `imgstore` partition, access the USBODE interface through a web browser on another system, then load an ISO. Once the ISO is loaded, be sure to switch the mode, so it's in mode `1` CD-ROM mode. I am currently looking into some logic to make sure whenever an ISO is loaded, the device stays in CD-ROM mode.
+1. Shut down the Pi if it's currently running. You can do so from the ODE's web page.
+2. Wait for the Pi to shut down, then unplug the USB cable and remove the MicroSD card.
+3. Plug the MicroSD card into your computer. Just about any adapter or USB reader should work. Once it's in, your computer should detect 3 partitions, including `imgstore` (See below if it doesn't appear).
+4. Copy one or more ISO files into the imgmount folder. At this time, the ISOs must all be lower-case (I.E. _image.iso_, not _IMAGE.ISO_ or _image.ISO_). We know for sure that underscores work, but other special characters might not.
+5. Once you've copied your ISO(s) over, safely eject the SD card from your computer.
+6. Put the card back into the pi and plug the USB cable back in. Again, it should go into the port labled USB, not PWR. Also, if it's not already, plug the other end of the USB cable into your target device.
+7. Once the device boots, visit the device's IP address in a browser. You can use the "Select an Image" link if one is not already loaded. This will allow you to select the ISO you want your emulated drive to load.
+8. If it is not already in Mode 1, make sure to use the Switch Modes option. This should switch from Mode 2 to Mode 1.
+
+The device's browser page is purposefully kept minimalist, so it will work on very old browsers. This allows you to change images from the computer you're emulating on, if you can connect to the same network.
+
+## Old documentation resumes here.
 
 ## Usage
 3. Main interface
