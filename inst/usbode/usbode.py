@@ -4,21 +4,6 @@ import os
 import logging
 import datetime
 from logging.handlers import RotatingFileHandler
-
-ScriptPath=os.path.dirname(__file__)
-sys.path.append(f"{ScriptPath}/waveshare")
-global oledEnabled
-global fontM
-global fontS
-global fontL
-try:
-    import SH1106
-    from PIL import Image, ImageDraw, ImageFont
-    oledEnabled = True
-    fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf",10)
-    fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf",9)
-except:
-    oledEnabled = False
 import time
 import subprocess
 import requests
@@ -29,22 +14,6 @@ import time
 import urllib.parse
 from flask import Flask
 
-store_dev = '/dev/mmcblk0p3'
-store_mnt = '/mnt/imgstore'
-allow_update_from_store = True
-gadgetCDFolder = '/sys/kernel/config/usb_gadget/usbode'
-iso_mount_file = '/opt/usbode/usbode-iso.txt'
-cdemu_cdrom = '/dev/cdrom'
-versionNum = "1.9"
-global updateEvent
-updateEvent = 0
-global exitRequested
-exitRequested = 0
-
-# First, add a lock to protect the updateEvent variable
-update_lock = Lock()
-
-# Add this near the top of your file after other imports
 def setup_logging():
     """Configure logging to both console and file"""
     log_file = '/boot/firmware/usbode-logs.txt'
@@ -81,6 +50,40 @@ def setup_logging():
 
 # Add this line after your imports but before any function definitions
 logger = setup_logging()
+
+ScriptPath=os.path.dirname(__file__)
+sys.path.append(f"{ScriptPath}/waveshare")
+global oledEnabled
+global fontM
+global fontS
+global fontL
+try:
+    import SH1106
+    from PIL import Image, ImageDraw, ImageFont
+    oledEnabled = True
+    fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf",10)
+    fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf",9)
+    logger.info("WaveShare Display Enabled")
+except Exception as e:
+    logger.warning(f"Failed to import SH1106 or PIL: {e}, waveshare display will not be used.")
+    oledEnabled = False
+
+store_dev = '/dev/mmcblk0p3'
+store_mnt = '/mnt/imgstore'
+allow_update_from_store = True
+gadgetCDFolder = '/sys/kernel/config/usb_gadget/usbode'
+iso_mount_file = '/opt/usbode/usbode-iso.txt'
+cdemu_cdrom = '/dev/cdrom'
+versionNum = "1.9"
+global updateEvent
+updateEvent = 0
+global exitRequested
+exitRequested = 0
+
+# First, add a lock to protect the updateEvent variable
+update_lock = Lock()
+
+# Add this near the top of your file after other imports
 
 def version():
     logger.info("USBODE - Turn your Pi Zero/Zero 2 into a virtual USB CD-ROM drive")
@@ -291,7 +294,7 @@ def exit():
 
 def getMountedCDName():
     if not os.path.exists(gadgetCDFolder+"/functions/mass_storage.usb0/lun.0/file"):
-        print("Error: ISO Not Set")
+        logger.exception("Error: ISO Not Set")
     with open(gadgetCDFolder+"/functions/mass_storage.usb0/lun.0/file", "r") as f:
         return f.readline().strip()
 
@@ -301,20 +304,18 @@ def prints(string):
 
 def list_images():
     fileList = []
-    print(f"Listing images in {store_mnt}...")
     dir_list=os.listdir(store_mnt)
     for file in dir_list:
         if (file.lower().endswith(".iso") or file.lower().endswith("cue")) and not (file.startswith("._")):
             fileList.append(file)
-            print(file)
     fileListSorted=sorted(fileList, key=str.lower)
-    print(f"Found {len(fileList)} files")
+    logger.info(f"Found {len(fileList)} files")
     return fileListSorted
     
 def cleanupMode(gadgetFolder=gadgetCDFolder):
     #Cleanup the gadget folder
     print("Unloading Gadget")
-    subprocess.run(['sh', 'scripts/cleanup_mode.sh', gadgetFolder], cwd="/opt/usbode")
+    logger.info(subprocess.run(['sh', 'scripts/cleanup_mode.sh', gadgetFolder], cwd="/opt/usbode", capture_output=True, text=True))
     time.sleep(.25)
 
 def init_gadget(type):
@@ -329,12 +330,13 @@ def init_gadget(type):
         if type == "cdrom":
             result = subprocess.run(['sh', 'scripts/cd_gadget_setup.sh', gadgetCDFolder], cwd="/opt/usbode", capture_output=True, text=True)
             if result.returncode != 0:
-                logger.error(f"CDROM gadget setup failed: {result.stderr}")
+                logger.exception(f"CDROM gadget setup failed: {result.stderr}")
             
             with open(iso_mount_file, "r") as f:
                 iso_filename = f.readline().strip()
             
             if iso_filename and os.path.exists(f"{iso_filename}"):
+                logger.info(f"Loading ISO: {iso_filename}")
                 change_Loaded_Mount(f"{iso_filename}")
             else:
                 logger.warning(f"The requested file to load {iso_filename} does not exist, switching to exFAT mode.")
@@ -343,7 +345,9 @@ def init_gadget(type):
         elif type == "exfat":
             result = subprocess.run(['sh', 'scripts/exfat_gadget_setup.sh', gadgetCDFolder], cwd="/opt/usbode", capture_output=True, text=True)
             if result.returncode != 0:
-                logger.error(f"ExFAT gadget setup failed: {result.stderr}")
+                logger.exception(f"ExFAT gadget setup failed: {result.stderr}")
+            else:
+                logger.info(f"Loading ExFAT: {store_dev}")
             change_Loaded_Mount(f"{store_dev}")
             
         enable_gadget()
@@ -353,7 +357,7 @@ def init_gadget(type):
 def enable_gadget():
     p = subprocess.run(['sh', 'scripts/enablegadget.sh', gadgetCDFolder], cwd="/opt/usbode")
     if p.returncode != 0:
-        print(f"failed: {p.returncode} {p.stderr} {p.stdout}")
+        logger.exception(f"failed: {p.returncode} {p.stderr} {p.stdout}")
         return False
     else:
         return True
@@ -363,7 +367,7 @@ def disable_gadget():
 
 def switch():
     if checkState(gadgetCDFolder) == 0:
-        print("Both modes are disabled, enabling exfat mode")
+        logger.error("Both modes are disabled, enabling exfat mode")
         disable_gadget()
         init_gadget("exfat")
         change_Loaded_Mount(f"{store_dev}")
@@ -386,7 +390,7 @@ def switch():
 def checkState(gadgetFolder=gadgetCDFolder):
     #Return Mode of the gadget 0 = not enabled, 1 = cdrom, 2 = exfat
     if not os.path.exists(gadgetFolder+"/UDC"):
-        print (f"{gadgetFolder}/UDC not found")
+        logger.error(f"{gadgetFolder}/UDC not found")
         return 0
     else:
         UDCContents=open(gadgetFolder+"/UDC", "r")
@@ -401,7 +405,7 @@ def checkState(gadgetFolder=gadgetCDFolder):
             elif cdromState == "0":
                 return 2
             else:
-                print(f"Could not read from {gadgetFolder}/functions/mass_storage.usb0/lun.0/cdrom")
+                logger.error(f"Could not read from {gadgetFolder}/functions/mass_storage.usb0/lun.0/cdrom")
                 return 0
 
 def change_Loaded_Mount(filename):
@@ -416,13 +420,13 @@ def change_Loaded_Mount(filename):
         isoloading = True
     #Change the disk image in the gadget
     if not os.path.exists(gadgetCDFolder+"/functions/mass_storage.usb0/lun.0/file"):
-        print("Gadget is not enabled, cannot change mount")
+        logger.error("Gadget is not enabled, cannot change mount")
         updateDisplay(disp)
         return False
     else:
         print(gadgetCDFolder+"/functions/mass_storage.usb0/lun.0/file")
         with open(gadgetCDFolder+"/functions/mass_storage.usb0/lun.0/file", "w") as f:
-            print(f"Changing mount to {filename}")
+            logger.info(f"Changing mount to {filename}")
             f.write(f"{filename}")
             f.close()
             if checkState() == 2 and isoloading == True:
@@ -438,8 +442,8 @@ def start_exit():
         stopPiOled()   
     disable_gadget()
     cleanupMode()
-    subprocess.run(['rmmod', 'usb_f_mass_storage'])
-    subprocess.run(['rmmod', 'libcomposite'])
+    logger.info(subprocess.run(['rmmod', 'usb_f_mass_storage'], capture_output=True, text=True))
+    logger.info(subprocess.run(['rmmod', 'libcomposite'], capture_output=True, text=True))
 
 def start_shutdown():
     print("Shutdown in progress...")
@@ -556,7 +560,40 @@ def updateDisplay_Advanced(disp):
             pass
         else:
             requests.request('GET', f'http://127.0.0.1/shutdown')
-       
+
+def showLEDLights():
+    #Creates a musicical pattern on the LED to indicate that the USBODE is ready
+    os.system('echo 1 > /sys/class/leds/ACT/brightness') # led on
+    time.sleep(.3)
+    os.system('echo 0 > /sys/class/leds/ACT/brightness') # led off
+    time.sleep(.1)
+    os.system('echo 1 > /sys/class/leds/ACT/brightness') # led on
+    time.sleep(.3)
+    os.system('echo 0 > /sys/class/leds/ACT/brightness') # led off
+    time.sleep(.1)
+    os.system('echo 1 > /sys/class/leds/ACT/brightness') # led on
+    time.sleep(.3)
+    os.system('echo 0 > /sys/class/leds/ACT/brightness') # led off
+    time.sleep(.1)
+    os.system('echo 1 > /sys/class/leds/ACT/brightness') # led on
+    time.sleep(.7)
+    os.system('echo 0 > /sys/class/leds/ACT/brightness') # led off
+    time.sleep(.1)
+    os.system('echo 1 > /sys/class/leds/ACT/brightness') # led on
+    time.sleep(.3)
+    os.system('echo 0 > /sys/class/leds/ACT/brightness') # led off
+    time.sleep(.1)
+    os.system('echo 1 > /sys/class/leds/ACT/brightness') # led on
+    time.sleep(.3)
+    os.system('echo 0 > /sys/class/leds/ACT/brightness') # led off
+    time.sleep(.1)
+    os.system('echo 1 > /sys/class/leds/ACT/brightness') # led on
+    time.sleep(.7)
+    os.system('echo 0 > /sys/class/leds/ACT/brightness') # led off
+    time.sleep(.1)
+    os.system('echo 1 > /sys/class/leds/ACT/brightness') # led on
+
+
 def getOLEDinput():
     global disp, exitRequested, updateEvent
     
@@ -664,22 +701,36 @@ def main():
         logger.info("IP scanner thread started")
         
         daemon = Thread(target=start_flask, daemon=True, name='Server')
-        daemon.start()
-        logger.info("Flask server thread started")
+        try: 
+            daemon.start()
+            logger.info("Flask server thread started")
+        except Exception as e:
+            logger.error(f"Failed to start Flask server: {e}")
         
         if os.path.exists(iso_mount_file):
             init_gadget("cdrom")
         else:
             init_gadget("exfat")
-            
+
+        #LED Lights aren't working yet
+        # daemonLEDBlinker = Thread(target=showLEDLights, daemon=True, name='LED Blinker')
+        # try:
+        #     daemonLEDBlinker.start()
+        #     logger.info("LED blinker thread started")
+        # except Exception as e:
+        #     logger.error(f"Failed to start LED blinker: {e}")
+
         global oledEnabled
         if oledEnabled:
             global disp
             disp = SH1106.SH1106()
-            logger.info("OLED Display Enabled")
             oledDaemon = Thread(target=getOLEDinput, daemon=True, name='OLED')
-            oledDaemon.start()
-            logger.info("OLED thread started")
+            try:
+                oledDaemon.start()
+                logger.info("Waveshare OLED thread started")
+
+            except Exception as e:
+                logger.error(f"Failed to start Waveshare OLED thread: {e}")
             
         while exitRequested == 0:
             time.sleep(0.15)
@@ -693,4 +744,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
