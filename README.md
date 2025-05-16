@@ -1,10 +1,16 @@
 # USBODE
 USBODE allows you to emulate an optical drive on nearly any computer equipped with a working USB port. It's like a Gotek Floppy Emulator, but for CD drives! It uses a Raspberry Pi Zero W or Zero W 2 to do the heavy lifting, and images are stored as .ISO files on a MicroSD card (no .Cue/.Bin support _yet_).
 
+## What can it do?
+By emulating a generic CD drive, you can:
+- Install old games without needing to fuss with physical media
+- Use images of recovery media to quickly restore a computer to factory fresh
+- If your computer supports booting from USB, you can even boot from the USBODE! Users have installed Windows 95/98 and other OSs this way.
+
 ## Requirements:
 1. A Raspberry Pi Zero W or Zero 2 W
 2. A MicroSD card you're willing to format. We suggest a 32 GB card, but you can get away with as little as 8.
-3. A USB cable with male Type A on one side, and male Micro B on the other. Micro B is what most people think of as an ordinary Micro USb cable. This cable needs to be capable of data transfer, not just power.
+3. A USB cable with male Type A on one side, and male Micro B on the other. Micro B is what most people think of as an ordinary Micro USB cable. This cable needs to be capable of data transfer, not just power.
 4. The latest [USB-ODE Release Image](https://github.com/danifunker/usbode/releases).
 5. The [Raspberry Pi Imager](https://www.raspberrypi.com/software/) application.
 6. A computer with a USB port (if you're using a modern computer to set this up, great. If you're intending to use this on a retro PC, it also needs a USB port).
@@ -27,40 +33,36 @@ USBODE loads ISO images from the MicroSD card that the Pi boots from. You'll nee
 1. Shut down the Pi if it's currently running. You can do so from the ODE's web page.
 2. Wait for the Pi to shut down, then unplug the USB cable and remove the MicroSD card.
 3. Plug the MicroSD card into your computer. Just about any adapter or USB reader should work. Once it's in, your computer should detect 3 partitions, including `imgstore` (See below if it doesn't appear).
-4. Copy one or more ISO files into the imgmount folder. At this time, the ISOs must all be lower-case (I.E. _image.iso_, not _IMAGE.ISO_ or _image.ISO_). We know for sure that underscores work, but other special characters might not.
+4. Copy one or more ISO files into the root of the `imgstore` partition. At this time, the ISOs must all be lower-case (I.E. _image.iso_, not _IMAGE.ISO_ or _image.ISO_). We know for sure that underscores work, but other special characters might not.
 5. Once you've copied your ISO(s) over, safely eject the SD card from your computer.
-6. Put the card back into the pi and plug the USB cable back in. Again, it should go into the port labled USB, not PWR. Also, if it's not already, plug the other end of the USB cable into your target device.
-7. Once the device boots, visit the device's IP address in a browser. You can use the "Select an Image" link if one is not already loaded. This will allow you to select the ISO you want your emulated drive to load.
+6. Put the card back into the Pi and plug the USB cable back in. Again, it should go into the port labled USB, not PWR. Also, if it's not already, plug the other end of the USB cable into your target device.
+7. Once the device boots (this time it should take somewhere between 18-30 seconds), navigate in your browser to `http://<IPAddress>`; for example, `http://192.168.0.50`. If you configured a hostname during the setup, you can also use that instead of an IP address; for example, `http://rpiODE`. The host name is case-sensitive. You can use the "Load another Image" link if one is not already loaded. This will allow you to select the ISO you want your emulated drive to load.
 8. If it is not already in Mode 1, make sure to use the Switch Modes option. This should switch from Mode 2 to Mode 1.
 
 The device's browser page is purposefully kept minimalist, so it will work on very old browsers. This allows you to change images from the computer you're emulating on, if you can connect to the same network.
 
-## Old documentation resumes here.
+## Troubleshooting
 
-## Usage
-3. Main interface
+### My target computer doesn't see the Pi as an Optical Drive.
+This is likely because the ODE is stuck in Mode 2 or Mode 0. See below for a resolution.
 
--  The USBODE interface will take about 30 (18 seconds with an A2 class microSD card) seconds to startup, once configured.
--  Initially drop some files from your computer into imgstore
--  Everything is controlled via web, navigate to `http://<IPAddress>` or http://<name from preconfigured hostname in step 1>
--  This project also supports the Waveshare 1.3" OLED HAT in SPI and I2C modes, details: https://www.waveshare.com/wiki/1.3inch_OLED_HAT
+### I can't switch to Mode 1; switching from Mode 2 takes me to Mode 0.
+This can be resolved by manually creating a text file. SSH into the Pi, then create a file at /opt/usbode/usbode-iso.txt.
 
-4. Adding files via Network / wifi  -- This is limited to Wi-Fi N speeds (or slower)
-   a. Make sure the device is in Mode 1 (ISO serving mode)
-   b. Use an FTP / ssh / sftp client to connect to `<IPAddress>`. Nagivate to `/mnt/imgstore`. Drop files here. If using FTP the path will automatically be set for you, don't forget to use port 21 as the port, and there is no encryption through this method.
-   d. To load the new file use the web interface, or the on-screen display.
+### After imaging with the Pi Imager, I only see two partitions on my card, and imgstore isn't one of them.
+This is a known issue on Windows. It's likely that the partition is there, but needs to be assigned a Drive Letter. It's easy to use the Disk Management tool to fix this. In the Start Menu, look for "Create and format hard disk partitions". Once this tool loads, find your SD card in the lower list of disks. You should see that there are three partitions. Right-click on `imgstore`, and select "Change Drive Letter and Paths". Click Add, then add whatever drive letter is most convenient for you. It should then immediately appear for you to drag files to.
 
-5. To change the Wireless network the Raspberry Pi is associated with, shutdown the Pi, eject the microSD card and place it back into the computer. Open up the `bootfs` volume and copy the new-wifi_example.json to new-wifi.json. Enter the new SSID and password. Since this is a JSON file, only to change what is between the `" "`. Safely eject the microsd card and place it back into the Raspberry Pi. The file will be read about 5 seconds after the USBODE starts and it will attempt to connect to the new wifi. If any issues occur, shutdown the USBODE and plug the SDCard back into the computer, and review the file named `new-wifi-output.txt` in the `bootfs` volume.
-
-## Application notes
-* Since the configfs settings are reloaded between configurations, and entirely destroyed on a reboot, I have opted to store the most recently loaded ISO filename into `/opt/usbode/usbode-iso.txt`. Not having this file should not cause any issues, since there is a setup endpoint that can be used for initial configuration, however I haven't tested that code path yet.
+## Other notes
+- USBODE supports the Waveshare 1.3" OLED HAT in SPI and I2C modes, giving you a very easy-to-navigate interface on the Pi itself. For details, visit (https://www.waveshare.com/wiki/1.3inch_OLED_HAT).
+- If the device is in Mode 1, you can establish an FTP, SSH, or SFTP connection to it to transfer images. Keep in mind that the transfer speed of this will be limited to 802.11N speeds.
+- You can change which WiFi network the Pi is associated with. Put the MicroSD card into your computer, and open the `bootfs` volume. From there, copy the file `new-wifi_example.json` and rename the copy `new-wifi.json`. In that file, enter your new SSID and password. Safely eject the microsd card and place it back into the Raspberry Pi. The file will be read about 5 seconds after the USBODE starts, and it will attempt to connect to the new wifi. If any issues occur, shutdown the USBODE and plug the SDCard back into the computer, and review the file named `new-wifi-output.txt` in the `bootfs` volume.
+- Since the configfs settings are reloaded between configurations, and entirely destroyed on a reboot, I have opted to store the most recently loaded ISO filename into `/opt/usbode/usbode-iso.txt`. Not having this file should not cause any issues, since there is a setup endpoint that can be used for initial configuration, however I haven't tested that code path yet.
 
 ## Llama-ITX Notes
 1. This works best with only a single ISO file being loaded
 2. If booting from scratch, on my Pi Zero 2 W it takes about 45 seconds to boot up into the ISO, so if you are cold booting the Llama and want to boot from disk, wait a bit in the BIOS screen. 
 3. Only a single USB is required to be connected to the Pi Zero 2 W for this application (so far) it CAN work with the data-only connection (USB Port closer to the HDMI/MicroSD slots)
 4. When operating in storage mode, be reminded this is an interface via ExFAT, so it will not be possible to access the filesystem on Operating Systems priror to Windows XP with the hotfix installed.
-
 
 ## Known Limitations
 DOS - Due to limitations in `USBASPI1.SYS` switching between exFAT mode and ISO serving a reboot. This is due to the way how the Pi handles the image swap it disconnected and reconnects it when switching modes. The previous limitation of switching ISOs in DOS mode has been lifted due to this re-write.
@@ -79,18 +81,15 @@ It is also possible to startup a second USB interface, possibly a COM port to be
 Feel free to contribue to the project.
 
 ## Discord Server
-For updates on this project please visit the discord server here: https://discord.gg/na2qNrvdFY
+For updates on this project please visit the discord server here: (https://discord.gg/na2qNrvdFY)
 
 ## Youtube Video
-I created a youtube video which covers the old installation process. The new process is almost the same, just no files are required to copy after imaging the device.
-
-Here is a link to my how-to video: https://www.youtube.com/watch?v=o7qsI4J0sys
+I created a [YouTube video](https://www.youtube.com/watch?v=o7qsI4J0sys) which covers the old installation process. The new process is almost the same, just no files are required to copy after imaging the device.
 
 This project will also be featured on video on [PhilsComputerLab](https://www.youtube.com/channel/UCj9IJ2QvygoBJKSOnUgXIRA)!
 Here is his [first video](https://www.youtube.com/watch?v=Is3ULD0ZXnI).
 Please like and subscribe to Phil so you can stay up to date on this project and many other cool retro computing things!
 
 ## Donations
-
 Support me on ko-fi!
-https://ko-fi.com/danifunker
+(https://ko-fi.com/danifunker)
