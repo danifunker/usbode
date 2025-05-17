@@ -68,8 +68,8 @@ This is a known issue on Windows. It's likely that the partition is there, but n
 4. When operating in storage mode, be reminded this is an interface via ExFAT, so it will not be possible to access the filesystem on Operating Systems priror to Windows XP with the hotfix installed.
 
 ## Known Limitations
-DOS - Due to limitations in `USBASPI1.SYS`, switching between modes 2 and 1 requires a reboot. The Pi has to disconnect from your machine and reconnect when swapping modes. 
-Case Sensitivity - Currently, any ISO you load needs to be all lower-case, including the file extension.
+- DOS - Due to limitations in `USBASPI1.SYS`, switching between modes 2 and 1 requires a reboot. The Pi has to disconnect from your machine and reconnect when swapping modes. 
+- Case Sensitivity - Currently, any ISO you load needs to be all lower-case, including the file extension.
 
 ## Todo
 - Add support for mounting Bin/Cue, enabling CDDA
