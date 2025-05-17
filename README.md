@@ -1,11 +1,14 @@
-# USBODE
-USBODE allows you to emulate an optical drive on nearly any computer equipped with a working USB port. It's like a Gotek Floppy Emulator, but for CD drives! It uses a Raspberry Pi Zero W or Zero W 2 to do the heavy lifting, and images are stored as .ISO files on a MicroSD card (no .Cue/.Bin support _yet_).
+# USBODE: the USB Optical Drive Emulator
+USBODE uses a Raspberry Pi Zero to emulate an optical drive over USB. It appears to your computer as a standard CD drive, and you can load up .ISO files stored on the Pi's MicroSD card. It can be easily configured over a web interface, and it can also take advantage of the Waveshare OLED hat.
 
 ## What can it do?
 By emulating a generic CD drive, you can:
-- Install old games without needing to fuss with physical media
-- Use images of recovery media to quickly restore a computer to factory fresh
-- If your computer supports booting from USB, you can even boot from the USBODE! Users have installed Windows 95/98 and other OSs this way.
+- Install and run CD-based games without the need for physical media
+- Boot from the drive to install an operating system or use recovery media
+- It even works for titles that use multiple CDs
+Since it uses a Pi to do the heavy lifting, you can also:
+- Store a collection of .ISO files on an SD card and quickly switch between them (No .CUE/.BIN support _yet_)
+- Mount .ISO images on operating systems that never had support for things like DaemonTools
 
 ## Requirements:
 1. A Raspberry Pi Zero W or Zero 2 W
@@ -22,24 +25,24 @@ By emulating a generic CD drive, you can:
    - Note, the Pi Zero W and Pi Zero W 2 support 2.4 GHz networks up to Wireless N (802.11N). They do not support 5 GHz networks. If your router broadcasts in both modes, input the name that the 2.4 GHz mode uses. It's fine if both modes use the same name.
 2. Once the Pi Imager Tool has completed, it will notify you. You should then eject the card and insert it into your Pi.
 3. Plug the USB cable into the computer you intend to emulate an optical drive on. The Pi has two Micro USB ports, one labled PWR and the other USB. Plug the Micro A end into the one labled USB, _not_ the one labled PWR. After a half-second or so, you should see the Pi's indicator LED flashing randomly, then in a pattern.
-4. The Pi is now performing an initial boot, which can take up to 10 minutes to complete on a first-gen Zero W (subsequent boots will be much faster, and the first boot will be faster if you have a faster SD card and a Zero W 2). Once this process is complete, the Pi will connect to the wifi network you assigned earlier. You should now be able to access the ODE by entering its IP address in a browser.
+4. The Pi is now performing an initial boot, which can take up to 10 minutes to complete on a first-gen Zero W (subsequent boots will be much faster, and the first boot will be faster if you have a faster SD card or a Zero W 2). Once this process is complete, the Pi will connect to the wifi network you assigned earlier. You should now be able to access the ODE by entering its IP address in a browser.
    - If you see "The connection has timed out", it is likely still booting. If you see a 500 error, this is usually resolved by rebooting the Pi.
 
 The setup should now be complete, and you're ready to go. If you have any difficulties, come check out the [Discord](https://discord.gg/na2qNrvdFY).
 
 ## Using USBODE
-USBODE loads ISO images from the MicroSD card that the Pi boots from. You'll need to put ISO files on that card for your device to see them. While you can transfer files over the network or over the Pi's USB cable, transfer speeds are much faster if you can plug your MicroSD card into a computer.
+USBODE loads ISO images from the MicroSD card that the Pi boots from. You'll need to put ISO files on that card for your device to see them. While you can transfer files over the network or over the Pi's USB cable, transfer speeds are much faster if you can plug your MicroSD card into a computer. Here's what that process looks like:
 
 1. Shut down the Pi if it's currently running. You can do so from the ODE's web page.
 2. Wait for the Pi to shut down, then unplug the USB cable and remove the MicroSD card.
 3. Plug the MicroSD card into your computer. Just about any adapter or USB reader should work. Once it's in, your computer should detect 3 partitions, including `imgstore` (See below if it doesn't appear).
 4. Copy one or more ISO files into the root of the `imgstore` partition. At this time, the ISOs must all be lower-case (I.E. _image.iso_, not _IMAGE.ISO_ or _image.ISO_). We know for sure that underscores work, but other special characters might not.
 5. Once you've copied your ISO(s) over, safely eject the SD card from your computer.
-6. Put the card back into the Pi and plug the USB cable back in. Again, it should go into the port labled USB, not PWR. Also, if it's not already, plug the other end of the USB cable into your target device.
+6. Put the card back into the Pi and do the same with the USB cable. Again, it should go into the port labled USB, not PWR.
 7. Once the device boots (this time it should take somewhere between 18-30 seconds), navigate in your browser to `http://<IPAddress>`; for example, `http://192.168.0.50`. If you configured a hostname during the setup, you can also use that instead of an IP address; for example, `http://rpiODE`. The host name is case-sensitive. You can use the "Load another Image" link if one is not already loaded. This will allow you to select the ISO you want your emulated drive to load.
 8. If it is not already in Mode 1, make sure to use the Switch Modes option. This should switch from Mode 2 to Mode 1.
 
-The device's browser page is purposefully kept minimalist, so it will work on very old browsers. This allows you to change images from the computer you're emulating on, if you can connect to the same network.
+The device's browser page is purposefully kept pretty simple, so it can still work on very old browsers. This allows you to change images from the computer you're emulating on, if you can connect to the same network.
 
 ## Troubleshooting
 
@@ -65,18 +68,15 @@ This is a known issue on Windows. It's likely that the partition is there, but n
 4. When operating in storage mode, be reminded this is an interface via ExFAT, so it will not be possible to access the filesystem on Operating Systems priror to Windows XP with the hotfix installed.
 
 ## Known Limitations
-DOS - Due to limitations in `USBASPI1.SYS` switching between exFAT mode and ISO serving a reboot. This is due to the way how the Pi handles the image swap it disconnected and reconnects it when switching modes. The previous limitation of switching ISOs in DOS mode has been lifted due to this re-write.
-
-This has been tested up to USBASPI 2.27.
+DOS - Due to limitations in `USBASPI1.SYS`, switching between modes 2 and 1 requires a reboot. The Pi has to disconnect from your machine and reconnect when swapping modes. 
+Case Sensitivity - Currently, any ISO you load needs to be all lower-case, including the file extension.
 
 ## Todo
-Since finding this project, I have the following todos:
-- Mount Bin/Cue files to support CDDA 
+- Add support for mounting Bin/Cue, enabling CDDA
 
-## Strech goal:
-Maybe create a method to change the ISO through a DOS program or TSR (I have no experience with this though)
-
-It is also possible to startup a second USB interface, possibly a COM port to be able to communicate with the app maybe.
+## Strech goals:
+- Make some way to change the mounted ISO through a DOS program or TSR? I have no experience with this and would appreciate any expertise you may have to offer.
+- Make a second USB interface, perhaps a COM port, to be able to communicate with the app.
 
 Feel free to contribue to the project.
 
@@ -86,7 +86,7 @@ For updates on this project please visit the discord server here: (https://disco
 ## Youtube Video
 I created a [YouTube video](https://www.youtube.com/watch?v=o7qsI4J0sys) which covers the old installation process. The new process is almost the same, just no files are required to copy after imaging the device.
 
-This project will also be featured on video on [PhilsComputerLab](https://www.youtube.com/channel/UCj9IJ2QvygoBJKSOnUgXIRA)!
+This project is also featured on video on [PhilsComputerLab](https://www.youtube.com/channel/UCj9IJ2QvygoBJKSOnUgXIRA)!
 Here is his [first video](https://www.youtube.com/watch?v=Is3ULD0ZXnI).
 Please like and subscribe to Phil so you can stay up to date on this project and many other cool retro computing things!
 
