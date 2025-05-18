@@ -27,7 +27,7 @@ Since it uses a Pi to do the heavy lifting, you can also:
 3. Preconfigure your hostname, login info (for SSH), WiFi information, and locale.
    - Note, the Pi Zero W and Pi Zero W 2 support 2.4 GHz networks up to Wireless N (802.11N). They do not support 5 GHz networks. If your router broadcasts in both modes, input the name that the 2.4 GHz mode uses. It's fine if both modes use the same name.
 4. Once the Pi Imager Tool has completed, it will notify you. You should then eject the card and insert it into your Pi.
-5. Plug the USB cable into the computer you intend to emulate an optical drive on. The Pi has two Micro USB ports, one labled PWR and the other USB. Plug the Micro A end into the one labled USB, _not_ the one labled PWR. After a half-second or so, you should see the Pi's indicator LED flashing randomly, then in a pattern.\
+5. Plug the USB cable into the computer you intend to emulate an optical drive on. The Pi has two Micro USB ports, one labled PWR and the other USB. Plug the Micro A end into the one labled USB, _not_ the one labled PWR. After a half-second or so, you should see the Pi's indicator LED flashing randomly, then in a pattern.
 6. The Pi is now performing an initial boot, which can take up to 10 minutes to complete on a first-gen Zero W (subsequent boots will be much faster, and the first boot will be faster if you have a faster SD card or a Zero W 2). Once this process is complete, the Pi will connect to the wifi network you assigned earlier. You should now be able to access the ODE by entering its IP address in a browser.
    - If you see "The connection has timed out", it is likely still booting. If you see a 500 error, this is usually resolved by rebooting the Pi.
 
