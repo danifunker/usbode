@@ -42,7 +42,7 @@ USBODE loads ISO images from the MicroSD card that the Pi boots from. You'll nee
 4. Copy one or more ISO files into the root of the `imgstore` partition.
 5. Once you've copied your ISO(s) over, safely eject the SD card from your computer.
 6. Put the card back into the Pi and do the same with the USB cable. Again, it should go into the port labled USB, not PWR.
-7. Once the device boots (this time it should take somewhere between 18-30 seconds), navigate in your browser to `http://<IPAddress>`; for example, `http://192.168.0.50`. If you configured a hostname during the setup, you can also use that instead of an IP address; for example, `http://rpiODE`. The host name is case-sensitive. You can use the "Load another Image" link if one is not already loaded. This will allow you to select the ISO you want your emulated drive to load.
+7. Once the device boots (this time it should take somewhere between 18-30 seconds), navigate in your browser to `http://<IPAddress>`; for example, `http://192.168.0.50`. If you configured a hostname during the setup, you can also use that instead of an IP address; I.E., `http://rpiODE`. The host name is case-sensitive. You can use the "Load another Image" link if one is not already loaded. This will allow you to select the ISO you want your emulated drive to load.
 8. If it is not already in Mode 1, make sure to use the Switch Modes option. This should switch from Mode 2 to Mode 1.
 
 The device's browser page is purposefully kept pretty simple, so it can still work on very old browsers. This allows you to change images from the computer you're emulating on, if you can connect to the same network.
