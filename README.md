@@ -2,50 +2,62 @@
 USBODE uses a Raspberry Pi Zero to emulate optical drives on retro computers equipped with USB. It appears to your computer as a standard CD drive, and you can load up .ISO files stored on the Pi's MicroSD card. It can be easily configured over a web interface, and it can also take advantage of the Waveshare OLED hat.
 
 ## What can it do?
-By emulating a generic CD drive, you can:
-- Install and run CD-based games without the need for physical media
-- Boot from the drive to install an operating system or use recovery media
-- It works for titles that use multiple CDs
-- It may not work with some forms of copy protection
-Since it uses a Pi to do the heavy lifting, you can also:
-- Store a collection of .ISO files on an SD card and quickly switch between them (No .CUE/.BIN support _yet_)
-- Mount .ISO images on operating systems that never had support for things like DaemonTools
+By emulating a CD-ROM drive with USBODE, you can:
+- Store a collection of ISO files on the SD card and quickly switch between them.
+- Install and run CD-based games without the need for physical media. This includes multi-disc titles.
+- Boot from the drive to install an operating system or use recovery media.
+Note: It may not work with some forms of CD-ROM copy protection. Also, there is no CUE/BIN support _yet_.
 
 ## Requirements:
-1. A Raspberry Pi Zero W or Zero 2 W
-2. A MicroSD card (Class A1 preferred) you're willing to format. We suggest starting with a 32 GB card, but you can get away with as little as 8 if you don't have any larger ones on hand.
-3. Some way to mount the Micro SD card on your computer (a built-in Micro SD card reader, an adapter via USB, etc.) so it can be imaged.
+1. A Raspberry Pi Zero W or Zero 2 W (USBODE is optimized for the Pi Zero 2 W)
+2. A MicroSD card. 32 GB or greater is recommended, however 8 GB is the absolute minimum. A fast card (e.g. A1 or A2) will improve boot and load times.
+3. A setup computer with the ability to mount and image the MicroSD card.
 4. A USB cable with male Type A on one side, and male [Micro B](https://en.wikipedia.org/wiki/USB_hardware#/media/File:MicroB_USB_Plug.jpg) on the other. Micro B is what most people think of as an ordinary Micro USB cable (as opposed to [Mini](https://en.wikipedia.org/wiki/USB_hardware#/media/File:Cable_Mini_USB.jpg)). This cable needs to be capable of data transfer, not just power.
 5. The latest [USB-ODE Release Image](https://github.com/danifunker/usbode/releases).
 6. The [Raspberry Pi Imager](https://www.raspberrypi.com/software/) application.
-8. A target computer with a USB port (we will plug the Pi into it later).
+7. A target computer with a USB port that will be utilizing USBODE.
 
-## Setting Up USBODE
-(Current as of v1.8; 1.7 and before have a different process)
-1. Plug your Micro SD card into your computer.
-2. Open the Pi Imager tool. Under `Choose Device`, select the model of Pi you're using. Under `Choose OS`, select the USB-ODE image you downloaded. Under `Choose Storage`, select your MicroSD card.
+## USBODE Initial Setup
+(From v1.8 onward; v1.7 and prior uses a different process)
+1. Plug your Micro SD card into your setup computer.
+2. Open the Raspberry Pi Imager tool. Under `Choose Device`, select the model of Pi you're using. Under `Choose OS`, select the USB-ODE image you downloaded. Under `Choose Storage`, select your MicroSD card.
 3. Preconfigure your hostname, login info (for SSH), Wi-Fi information, and locale.
    - Note, the Pi Zero W and Pi Zero W 2 support 2.4 GHz networks up to Wireless N (802.11N). They do not support 5 GHz networks. If your router broadcasts in both modes, input the name that the 2.4 GHz mode uses. It's fine if both modes use the same name.
-4. Once the Pi Imager Tool has completed, it will notify you. You should then eject the card and insert it into your Pi.
-5. Plug the USB cable into the computer you intend to emulate an optical drive on. The Pi has two Micro USB ports, one labeled PWR and the other USB. Plug the Micro A end into the one labeled USB, _not_ the one labeled PWR. After a half-second or so, you should see the Pi's indicator LED flashing randomly, then in a pattern.
-6. The Pi is now performing an initial boot, which can take a while (See the bullet on card speeds under "Other Notes"). Once this process is complete, the Pi will connect to the Wi-Fi network you assigned earlier. You should now be able to access the ODE by entering its IP address in a browser.
+4. Once the Pi Imager Tool has completed, it will notify you. Eject the card and insert it into your Pi Zero.
+5. Connect the Pi Zero to your setup computer. The Pi Zero has two Micro USB connections ports: one labeled USB and the other labeled PWR. Insert the Micro B end of the cable into the port labeled USB. The Pi’s indicator LED will begin flashing soon after.
+6. The Pi will perform an initial setup boot, which can take a while (See the bullet on card speeds under "Other Notes"). When the initial setup is complete, a drive called IMGSTORE should appear on your setup computer. You can copy ISO images into this folder now if you’d like.
+7. You should now be able to access the USBODE browser interface by entering its IP address (or the Hostname if you defined that earlier) in a web-browser. If your router automatically assigns IP addresses via DHCP, log into your router’s web interface to see the IP assigned to your Pi Zero device. See the section below on navigating the USBODE browser interface.
    - If you see "The connection has timed out", it is likely still booting. If you see a 500 error, this is usually resolved by rebooting the Pi.
 
-The setup should now be complete, and you're ready to go. If you have any difficulties, come check out the [Discord](https://discord.gg/na2qNrvdFY).
+The setup should now be complete. If you have any difficulties, help is available on [Discord](https://discord.gg/na2qNrvdFY).
 
-## Using USBODE
-USBODE loads ISO images from the MicroSD card that the Pi boots from. You'll need to put ISO files on that card for your device to see them. While you can transfer files over the network or over the Pi's USB cable, transfer speeds are much faster if you can plug your MicroSD card into a computer. Here's what that process looks like:
+## Using USBODE on the target computer
+1. Shut down the target computer.
+2. Connect the Pi Zero to the target computer. As above, the Micro B end of the cable needs to be plugged into the Pi's `USB` port, not `PWR`. The other end will plug into any of the target computer's USB ports.
+3. Turn on the target computer. The Pi Zero's indicator LED will start blinking.
+4. Once the target computer boots, it should be able to see the USBODE as a standard CD-ROM drive. See the Browser Interface section below to load images.
 
-1. Shut down the Pi if it's currently running. You can do so from the ODE's web page.
-2. Wait for the Pi to shut down, then unplug the USB cable and remove the MicroSD card.
-3. Plug the MicroSD card into your computer. Just about any adapter or USB reader should work. Once it's in, your computer should detect 3 partitions, including `imgstore` (See below if it doesn't appear).
-4. Copy one or more ISO files into the root of the `imgstore` partition.
-5. Once you've copied your ISO(s) over, safely eject the SD card from your computer.
-6. Put the card back into the Pi and do the same with the USB cable. Again, it should go into the port labeled USB, not PWR.
-7. Once the device boots (this time it shouldn't take nearly as long; a minute on slow cards, 18-30 seconds on faster ones), navigate in your browser to `http://<IPAddress>`; for example, `http://192.168.0.50`. If you configured a hostname during the setup, you can also use that instead of an IP address; I.E., `http://rpiODE`. The host name is case-sensitive. You can use the "Load another Image" link if one is not already loaded. This will allow you to select the ISO you want your emulated drive to load.
-8. If it is not already in Mode 1, make sure to use the Switch Modes option. This should switch from Mode 2 to Mode 1.
+## Copying Images onto USBODE
+USBODE stores your ISO images on the MicroSD card in a folder labeled IMGSTORE. You'll need to put ISO files directly into this folder. There are three ways to do this:
+- Connect the Pi Zero to your setup computer via USB.
+- Remove the MicroSD card from the Pi Zero and connect it directly to your setup computer. Transfer speeds are probably the fastest with this option.
+- Connect to USBODE via SSH.
 
-The device's browser page is purposefully kept pretty simple, so it can still work on very old browsers. This allows you to change images from the computer you're emulating on, if you can connect to the same network.
+## Using the USBODE Browser Interface
+The browser interface is used to switch modes, load an image, and shutdown the device.
+
+### Switching Modes:
+USBODE has two modes. _Mode 1: CD-Emulator_ and _Mode 2: Ex-FAT Storage Device_.
+
+Use the _/switch_ link in the browser interface to switch between Modes 1 and 2.
+
+In Mode 1, USBODE serves a single ISO image to the target computer. The target computer sees the image as CD-ROM media. In Mode 2, USBODE presents itself to a computer (target or setup) as a storage device named IMGSTORE. To copy images from a computer to USBODE storage, you must be in Mode 2.
+
+### Loading an Image:
+The image currently being served is displayed on the browser page after the text _Currently Serving_. To change the image being served, first make sure you are in Mode 1  then click _Load Another Image_. This will navigate to a page listing all the images stored on the device. Click on the image you would like to load, and you'll see a page informing you that it is attempting to mount the image. Click _Return to USBODE homepage_ to confirm that the image was loaded.
+
+### Shutting Down USBODE:
+On the USBODE homepage, click _Shutdown the pi_. The LED indicator will flash for several seconds and eventually turn off. It is now safe to unplug the device from the computer.
 
 ## Troubleshooting
 
@@ -54,6 +66,9 @@ This is likely because the ODE is stuck in Mode 2 or Mode 0. See below for a res
 
 ### Windows: My computer doesn't see the `imgstore` partition on my SD card after imaging with the Pi Imager.
 The partition is there, but did not get assigned a drive letter. Manually assigning a drive letter with your preferred tool will make it appear. If you're unfamiliar, search for "disk" in the Start Menu and one of the first results should be "Create and format hard disk partitions". Once it loads, find your SD card in the lower list of disks. You should see that there are three partitions on it, including imgstore. Right-click on `imgstore`, and select "Change Drive Letter and Paths". Click Add, then add whatever drive letter is most convenient for you. It should then immediately appear in Explorer for you to drag files to.
+
+### How can I boot from the USBODE if it isn't ready until after my computer POSTs?
+Use the `Pause/Break` key when you first see the POST screen. This will give the Pi enough time to boot. Once it's ready, load up an image using the browser interface (or a Hat if you have one). Then, press the `Enter` key to resume the POST. You should be able to go into the BIOS and select it as a bootable device at this time.
 
 ## Other notes
 - USBODE supports the Waveshare 1.3" OLED HAT in SPI and I2C modes, giving you a very easy-to-navigate interface on the Pi itself. For details, visit (https://www.waveshare.com/wiki/1.3inch_OLED_HAT).
