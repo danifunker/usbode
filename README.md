@@ -103,8 +103,11 @@ I created a [YouTube video](https://www.youtube.com/watch?v=o7qsI4J0sys) which c
 
 This project is also featured on video on [PhilsComputerLab](https://www.youtube.com/channel/UCj9IJ2QvygoBJKSOnUgXIRA)!
 Here is his [first video](https://www.youtube.com/watch?v=Is3ULD0ZXnI).
+
 Please like and subscribe to Phil so you can stay up to date on this project and many other cool retro computing things!
 
 ## Donations
 Support me on ko-fi!
 (https://ko-fi.com/danifunker)
+
+Readme updated by [Zarf](https://github.com/Zarf-42) and wayneknight_rider.
