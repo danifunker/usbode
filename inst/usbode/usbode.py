@@ -1311,6 +1311,7 @@ def updateST7789Display(display):
     draw.rectangle([(folder_x+2, folder_y), (folder_x+10, folder_y+5)], 
                   outline=(0, 0, 0), fill=(255, 223, 128), width=2)
     
+    
     display.display(image)
     
 def updateST7789Display_FileS(display, iterator, file_list):
@@ -1338,7 +1339,7 @@ def updateST7789Display_FileS(display, iterator, file_list):
     
     # Show current ISO name with more characters (up to 25) since we're using smaller font
     current_iso = str.replace(getMountedCDName(), store_mnt+'/', '')
-    if len(current_iso) > 25:  # If longer than 25 chars, show first 10 + "…" + last 10
+    if len(current_iso) > 25:  # If longer than 25 chars, show first 12 + "…" + last 12
         current_iso_display = current_iso[:12] + "…" + current_iso[-12:]  # Using Unicode ellipsis character
     else:
         current_iso_display = current_iso  # If short enough, show the whole thing
@@ -1415,24 +1416,19 @@ def updateST7789Display_FileS(display, iterator, file_list):
     draw.line([(arrow_x, arrow_y-8), (arrow_x, arrow_y+12)], fill=(0, 0, 0), width=3)
     draw.line([(arrow_x-8, arrow_y), (arrow_x, arrow_y+12), (arrow_x+8, arrow_y)], fill=(0, 0, 0), width=3)
     
-    # X button - Advanced menu (three horizontal lines, larger)
+    # X button - Cancel (red X, larger) - UPDATED to match Advanced menu
     draw.text((132, 200), "X", font=st_fontS, fill=(255, 255, 255))
-    # Draw three lines
-    menu_x, menu_y = 150, 200
-    draw.line([(menu_x, menu_y+1), (menu_x+20, menu_y+1)], fill=(0, 0, 0), width=3)
-    draw.line([(menu_x, menu_y+8), (menu_x+20, menu_y+8)], fill=(0, 0, 0), width=3)
-    draw.line([(menu_x, menu_y+15), (menu_x+20, menu_y+15)], fill=(0, 0, 0), width=3)
+    # Draw X
+    x_x, x_y = 150, 205
+    draw.line([(x_x-10, x_y-10), (x_x+10, x_y+10)], fill=(255, 0, 0), width=3)
+    draw.line([(x_x+10, x_y-10), (x_x-10, x_y+10)], fill=(255, 0, 0), width=3)
     
-    # Y button - ISO selection (folder icon instead of CD)
+    # Y button - Select/OK (green checkmark, larger) - UPDATED to match Advanced menu
     draw.text((192, 200), "Y", font=st_fontS, fill=(255, 255, 255))
-    # Draw folder icon
-    folder_x, folder_y = 210, 198
-    # Folder base
-    draw.rectangle([(folder_x, folder_y+5), (folder_x+20, folder_y+20)], 
-                  outline=(0, 0, 0), fill=(255, 223, 128), width=2)
-    # Folder tab
-    draw.rectangle([(folder_x+2, folder_y), (folder_x+10, folder_y+5)], 
-                  outline=(0, 0, 0), fill=(255, 223, 128), width=2)
+    # Draw checkmark
+    check_x, check_y = 210, 210
+    draw.line([(check_x-10, check_y), (check_x, check_y+10), (check_x+15, check_y-15)], 
+              fill=(0, 255, 0), width=3)
     
     display.display(image)
 
