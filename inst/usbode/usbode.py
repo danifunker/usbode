@@ -413,7 +413,7 @@ def change_Loaded_Mount(filename):
     #Save the ISO filename to to persistent storage
     if checkState() == 1:
         subprocess.run(['sh', 'scripts/force_eject_iso.sh', gadgetCDFolder], cwd="/opt/usbode")
-    if filename.endswith(".iso") or filename.endswith(".cue"): 
+    if filename.lower().endswith(".iso") or filename.lower().endswith(".cue"): 
         f = open(iso_mount_file, "w")
         f.write(f"{filename}" + "\n")
         f.close()
