@@ -61,30 +61,25 @@ global st7789Enabled
 oledEnabled = False
 st7789Enabled = False
 
-try:
+display_type = detect_display_type()
+oledEnabled = (display_type == "sh1106" or display_type == "sh1106_i2c" or display_type == "sh1106_spi")
+st7789Enabled = (display_type == "st7789")
+
+logger.info(f"Display autodetection result: {display_type}")
+
+if st7789Enabled:
     import st7789
     from PIL import Image, ImageDraw, ImageFont
-    st7789Enabled = True
     # Pirate Audio display is 240x240 pixels, so we can use larger fonts
     st_fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 18)
     st_fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 14)
-    logger.info("ST7789 Display Enabled (Pirate Audio)")
-except Exception as e:
-    logger.warning(f"Failed to import ST7789: {e}, Pirate Audio display will not be used.")
-    st7789Enabled = False
-
-# Only try to import SH1106 if ST7789 is not available to avoid pin conflicts
-if not st7789Enabled:
-    try:
-        import SH1106
-        from PIL import Image, ImageDraw, ImageFont
-        oledEnabled = True
-        fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 10)
-        fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 9)
-        logger.info("WaveShare Display Enabled")
-    except Exception as e:
-        logger.warning(f"Failed to import SH1106 or PIL: {e}, waveshare display will not be used.")
-        oledEnabled = False
+    logger.info("ST7789 Display initialized (Pirate Audio)")
+elif oledEnabled:
+    import SH1106
+    from PIL import Image, ImageDraw, ImageFont
+    fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 10)
+    fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 9)
+    logger.info("SH1106 OLED Display initialized (WaveShare)")
 
 store_dev = '/dev/mmcblk0p3'
 store_mnt = '/mnt/imgstore'
@@ -92,7 +87,7 @@ allow_update_from_store = True
 gadgetCDFolder = '/sys/kernel/config/usb_gadget/usbode'
 iso_mount_file = '/opt/usbode/usbode-iso.txt'
 cdemu_cdrom = '/dev/cdrom'
-versionNum = "1.9"
+versionNum = "1.10"
 global updateEvent
 updateEvent = 0
 global exitRequested
@@ -128,6 +123,136 @@ def getMyIPAddress():
             # Use the lock to safely set the update event
             with update_lock:
                 updateEvent = 1
+
+def detect_display_type():
+    """Detect display type by checking SPI and I2C interfaces and hardware characteristics"""
+    logger.info("Detecting display hardware...")
+    
+    try:
+        # Check for I2C interfaces first
+        i2c_available = False
+        try:
+            # Look for available I2C buses
+            if os.path.exists('/dev/i2c-0') or os.path.exists('/dev/i2c-1'):
+                i2c_available = True
+                logger.info("I2C interface(s) detected")
+                
+                # Try to detect SH1106 OLED on I2C
+                try:
+                    # Import smbus to check I2C
+                    import smbus
+                    # Check if SH1106 module is available
+                    import SH1106
+                    from PIL import Image, ImageDraw, ImageFont
+                    
+                    # Try to initialize the bus (usually bus 1 on newer Pi models)
+                    bus_num = 1 if os.path.exists('/dev/i2c-1') else 0
+                    bus = smbus.SMBus(bus_num)
+                    
+                    # SH1106 typically uses address 0x3C or 0x3D
+                    i2c_addresses = [0x3C, 0x3D]
+                    for addr in i2c_addresses:
+                        try:
+                            # Try to write a command to the display
+                            bus.write_byte_data(addr, 0x00, 0xAF)  # Display on command
+                            bus.close()
+                            logger.info(f"SH1106 OLED detected on I2C bus {bus_num}, address 0x{addr:02X}")
+                            return "sh1106_i2c"
+                        except Exception:
+                            # No device at this address, continue checking
+                            continue
+                except ImportError as e:
+                    logger.warning(f"I2C or SH1106 module not available: {e}")
+                except Exception as e:
+                    logger.warning(f"Error checking for I2C SH1106: {e}")
+        except Exception as e:
+            logger.warning(f"Error checking I2C interfaces: {e}")
+        
+        # Then check if SPI is available for other display types
+        if not os.path.exists('/dev/spidev0.0') and not os.path.exists('/dev/spidev0.1'):
+            if i2c_available:
+                # We already checked I2C and didn't find anything
+                logger.warning("No SPI devices found, and no supported I2C displays detected")
+            else:
+                logger.warning("No SPI or I2C interfaces found, display detection may fail")
+            return "none"
+        
+        # Try to determine which display is connected via SPI
+        spi_devices = []
+        try:
+            # List SPI devices
+            if os.path.exists('/dev/spidev0.0'):
+                spi_devices.append('0.0')
+            if os.path.exists('/dev/spidev0.1'):
+                spi_devices.append('0.1')
+                
+            logger.info(f"Found SPI devices: {spi_devices}")
+            
+            # Import GPIO
+            import RPi.GPIO as GPIO
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setwarnings(False)
+            
+            # Check for Pirate Audio (ST7789) first - it uses specific GPIO pins
+            st7789_detected = False
+            try:
+                # Pirate Audio uses GPIO 13 for backlight
+                GPIO.setup(13, GPIO.OUT)
+                # Test backlight
+                GPIO.output(13, GPIO.HIGH)
+                time.sleep(0.1)
+                GPIO.output(13, GPIO.LOW)
+                time.sleep(0.1)
+                GPIO.output(13, GPIO.HIGH)
+                
+                # Check for ST7789 module availability
+                import st7789
+                from PIL import Image, ImageDraw, ImageFont
+                
+                # Check if SPI device 0.1 exists (Pirate Audio uses this)
+                if '0.1' in spi_devices:
+                    logger.info("ST7789 hardware detected (Pirate Audio)")
+                    st7789_detected = True
+                    return "st7789"
+            except ImportError:
+                logger.warning("ST7789 module not available")
+            except Exception as e:
+                logger.warning(f"ST7789 detection error: {e}")
+            
+            # If ST7789 not detected, check for SH1106 OLED in SPI mode
+            if not st7789_detected:
+                try:
+                    # Check for SH1106 module
+                    import SH1106
+                    from PIL import Image, ImageDraw, ImageFont
+                    
+                    # The SH1106 uses SPI device 0.0 and specific pins
+                    # We can test if the DC pin is usable (GPIO 25 for Waveshare OLED)
+                    GPIO.setup(25, GPIO.OUT)  # DC pin for Waveshare OLED
+                    GPIO.output(25, GPIO.HIGH)
+                    time.sleep(0.1)
+                    GPIO.output(25, GPIO.LOW)
+                    
+                    if '0.0' in spi_devices:
+                        logger.info("SH1106 OLED hardware detected (Waveshare SPI)")
+                        return "sh1106_spi"
+                except ImportError:
+                    logger.warning("SH1106 module not available")
+                except Exception as e:
+                    logger.warning(f"SH1106 SPI detection error: {e}")
+            
+            # Clean up GPIO
+            GPIO.cleanup()
+            
+        except Exception as e:
+            logger.error(f"Error checking SPI devices: {e}")
+        
+        logger.warning("No supported display detected")
+        return "none"
+        
+    except Exception as e:
+        logger.error(f"Error during display detection: {e}")
+        return "none"
 
 ### Begining of Web Interface ###
 
