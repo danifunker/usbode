@@ -62,222 +62,149 @@ oledEnabled = False
 st7789Enabled = False
 
 def detect_display_type():
-    """Detect display type by checking SPI and I2C interfaces and hardware characteristics"""
-    logger.info("Detecting display hardware...")
-    
-    # Track all detected displays to help with debugging
-    possible_displays = []
+    """Detect display type using external commands for safer GPIO pin checking"""
+    logger.info("Detecting display hardware using non-invasive methods...")
     
     try:
-        # Check specifically for Waveshare OLED first - this is a more definitive check
-        waveshare_detected = False
+        # First check if a config file specifies the display
+        config = load_config()
+        display_setting = config.get('display', 'auto').lower()
+        
+        if display_setting != 'auto':
+            if display_setting == 'waveshare' or display_setting == 'sh1106_spi':
+                logger.info("Using Waveshare OLED display (SPI) from config file")
+                return "sh1106_spi"
+            elif display_setting == 'waveshare-i2c' or display_setting == 'sh1106_i2c':
+                logger.info("Using Waveshare OLED display (I2C) from config file")
+                return "sh1106_i2c"
+            elif display_setting == 'pirateaudio' or display_setting == 'st7789':
+                logger.info("Using Pirate Audio display (ST7789) from config file")
+                return "st7789"
+            elif display_setting == 'none' or display_setting == 'disabled':
+                logger.info("Displays disabled in config file")
+                return "none"
+            
+        # If no config or set to auto, try using raspi-gpio (usually pre-installed on Raspberry Pi OS)
+        pin_states = {}
         try:
-            import SH1106
-            import RPi.GPIO as GPIO
+            # Check the GPIO state using raspi-gpio command
+            logger.info("Trying raspi-gpio for pin state detection")
+            for pin, pin_name in [(34, 'pirate_audio_pin'), (43, 'waveshare_pin'), (9, 'dc_pin'), (13, 'backlight_pin')]:
+                output = subprocess.check_output(['raspi-gpio', 'get', str(pin)], text=True)
+                # Output format is like: "GPIO 34: level=0 fsel=0 alt=0 func=INPUT"
+                if 'level=0' in output:
+                    pin_states[pin_name] = 0
+                    logger.info(f"GPIO {pin} ({pin_name}) state: LOW")
+                elif 'level=1' in output:
+                    pin_states[pin_name] = 1
+                    logger.info(f"GPIO {pin} ({pin_name}) state: HIGH")
+                else:
+                    pin_states[pin_name] = None
+                    logger.warning(f"Could not determine state of GPIO {pin} ({pin_name})")
+        except (subprocess.SubprocessError, FileNotFoundError) as e:
+            logger.warning(f"raspi-gpio command failed: {e}")
             
-            # Set GPIO mode
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setwarnings(False)
-            
-            # The Waveshare OLED HAT has very specific GPIO pins for its buttons
-            # These are the most reliable way to identify it
-            key1_pin = 21  # K1 button on Waveshare OLED
-            key2_pin = 20  # K2 button on Waveshare OLED
-            key3_pin = 16  # K3 button on Waveshare OLED
-            
-            # Check if these pins match the Waveshare OLED pattern
-            key_pins_detected = 0
+            # Try using gpio command as fallback (from WiringPi, might be installed)
             try:
-                # Set up pins as inputs with pull-ups
-                for pin in [key1_pin, key2_pin, key3_pin]:
-                    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-                    if GPIO.input(pin) is not None:  # If pin is readable
-                        key_pins_detected += 1
-                    GPIO.cleanup(pin)
-                
-                # If at least 2 of 3 key pins are detected, consider it a Waveshare
-                if key_pins_detected >= 2 and os.path.exists('/dev/spidev0.0'):
-                    logger.info(f"Waveshare OLED detected - {key_pins_detected}/3 key pins confirmed")
-                    waveshare_detected = True
-                    possible_displays.append("sh1106_spi")
-                    
-                    # Try to initialize the display as a definitive test
+                logger.info("Trying gpio command for pin state detection")
+                for pin, pin_name in [(34, 'pirate_audio_pin'), (43, 'waveshare_pin'), (9, 'dc_pin'), (13, 'backlight_pin')]:
+                    # First make sure it's set as input with pullup
+                    subprocess.run(['gpio', '-g', 'mode', str(pin), 'up'], check=False)
+                    # Then read the value
+                    output = subprocess.check_output(['gpio', '-g', 'read', str(pin)], text=True)
+                    value = int(output.strip())
+                    pin_states[pin_name] = value
+                    logger.info(f"GPIO {pin} ({pin_name}) state: {'HIGH' if value else 'LOW'}")
+            except (subprocess.SubprocessError, FileNotFoundError) as e:
+                logger.warning(f"gpio command failed: {e}")
+        
+        # Check if all pins are LOW - if so, no display is connected
+        pirate_audio_pin = pin_states.get('pirate_audio_pin')
+        waveshare_pin = pin_states.get('waveshare_pin')
+        dc_pin = pin_states.get('dc_pin')
+        backlight_pin = pin_states.get('backlight_pin')
+        
+        # Check if all pins are LOW (indicates no display)
+        if (pirate_audio_pin == 0 and waveshare_pin == 0 and 
+            dc_pin == 0 and backlight_pin == 0):
+            logger.info("All display pins are LOW - no display appears to be connected")
+            return "none"
+        
+        # Determine display type based on pin states (if we were able to get them)
+        if pirate_audio_pin is not None and waveshare_pin is not None:
+            # Pirate Audio: GPIO 34 is LOW, GPIO 43 is HIGH
+            if pirate_audio_pin == 0 and waveshare_pin == 1:
+                logger.info("GPIO pin states match Pirate Audio (ST7789)")
+                return "st7789"
+            
+            # Waveshare: GPIO 34 is HIGH, GPIO 43 is LOW
+            elif pirate_audio_pin == 1 and waveshare_pin == 0:
+                logger.info("GPIO pin states match Waveshare OLED (SH1106)")
+                # Check if I2C is available to determine SPI vs I2C variant
+                if os.path.exists('/dev/i2c-1'):
                     try:
-                        test_disp = SH1106.SH1106()
-                        test_disp.Init()
-                        test_disp.clear()
-                        logger.info("Successfully initialized SH1106 display - confirmed Waveshare OLED")
-                        test_disp.RPI.module_exit()
-                        return "sh1106_spi"  # Definitive detection - return immediately
-                    except Exception as e:
-                        logger.warning(f"SH1106 initialization test failed: {e}")
-            except Exception as e:
-                logger.warning(f"Error during Waveshare key pin detection: {e}")
+                        # Use i2cdetect to safely check I2C device presence
+                        output = subprocess.check_output(['i2cdetect', '-y', '1'], text=True)
+                        if '3c' in output or '3d' in output:
+                            logger.info("SH1106 OLED detected on I2C")
+                            return "sh1106_i2c"
+                    except (subprocess.SubprocessError, FileNotFoundError):
+                        pass
                 
-        except ImportError as e:
-            logger.warning(f"SH1106 module not available: {e}")
-        except Exception as e:
-            logger.warning(f"Error during Waveshare detection: {e}")
+                # If I2C check didn't succeed, default to SPI
+                logger.info("Defaulting to SH1106 SPI interface for Waveshare")
+                return "sh1106_spi"
         
-        # Check for I2C interfaces - SH1106 OLED can be on I2C
-        i2c_available = False
-        try:
-            # Look for available I2C buses
-            if os.path.exists('/dev/i2c-0') or os.path.exists('/dev/i2c-1'):
-                i2c_available = True
-                logger.info("I2C interface(s) detected")
-                
-                # Try to detect SH1106 OLED on I2C
-                try:
-                    # Import smbus to check I2C
-                    import smbus
-                    # Check if SH1106 module is available
-                    import SH1106
-                    from PIL import Image, ImageDraw, ImageFont
-                    
-                    # Try to initialize the bus (usually bus 1 on newer Pi models)
-                    bus_num = 1 if os.path.exists('/dev/i2c-1') else 0
-                    bus = smbus.SMBus(bus_num)
-                    
-                    # SH1106 typically uses address 0x3C or 0x3D
-                    i2c_addresses = [0x3C, 0x3D]
-                    for addr in i2c_addresses:
-                        try:
-                            # Try to write a command to the display
-                            bus.write_byte_data(addr, 0x00, 0xAF)  # Display on command
-                            bus.close()
-                            logger.info(f"SH1106 OLED detected on I2C bus {bus_num}, address 0x{addr:02X}")
-                            possible_displays.append("sh1106_i2c")
-                            return "sh1106_i2c"  # I2C OLED found, return immediately
-                        except Exception:
-                            # No device at this address, continue checking
-                            continue
-                except ImportError as e:
-                    logger.warning(f"I2C or SH1106 module not available: {e}")
-                except Exception as e:
-                    logger.warning(f"Error checking for I2C SH1106: {e}")
-        except Exception as e:
-            logger.warning(f"Error checking I2C interfaces: {e}")
+        # Fall back to passive detection methods
+        logger.info("GPIO pin detection inconclusive, using passive detection methods")
         
-        # Check if SPI is available for other display types
-        spi_devices = []
-        if os.path.exists('/dev/spidev0.0'):
-            spi_devices.append('0.0')
+        # Before trying to detect hardware, check again if all pins are low
+        # which is a stronger indication that no display is connected
+        if all(pin == 0 for pin in [pirate_audio_pin, waveshare_pin, dc_pin, backlight_pin] 
+               if pin is not None):
+            logger.info("All detected pins are LOW, likely no display connected")
+            return "none"
+        
+        # Check if displays are physically present by looking for their interfaces
         if os.path.exists('/dev/spidev0.1'):
-            spi_devices.append('0.1')
-            
-        if not spi_devices:
-            logger.warning("No SPI devices found")
-            # If we have any possible displays from earlier checks, return the first one
-            if possible_displays:
-                logger.info(f"Using previously detected display: {possible_displays[0]}")
-                return possible_displays[0]
-            return "none"
+            try:
+                import st7789
+                logger.info("ST7789 library available and SPI 0.1 detected - likely Pirate Audio")
+                return "st7789"
+            except ImportError:
+                logger.warning("SPI 0.1 available but ST7789 module not found")
         
-        logger.info(f"Found SPI devices: {spi_devices}")
+        if os.path.exists('/dev/i2c-1'):
+            try:
+                # Use i2cdetect to check for SH1106 addresses
+                output = subprocess.check_output(['i2cdetect', '-y', '1'], text=True)
+                if '3c' in output or '3d' in output:
+                    try:
+                        import SH1106
+                        logger.info("SH1106 OLED detected on I2C")
+                        return "sh1106_i2c"
+                    except ImportError:
+                        logger.warning("I2C device found but SH1106 module not available")
+            except (subprocess.SubprocessError, FileNotFoundError):
+                pass
         
-        # If we already detected Waveshare but didn't return early, it's still the most likely
-        if waveshare_detected:
-            logger.info("Using previously detected Waveshare OLED display")
-            return "sh1106_spi"
+        if os.path.exists('/dev/spidev0.0'):
+            try:
+                import SH1106
+                logger.info("SH1106 library available and SPI 0.0 detected - likely Waveshare OLED")
+                return "sh1106_spi"
+            except ImportError:
+                logger.warning("SPI 0.0 available but SH1106 module not found")
         
-        # Check for Pirate Audio (ST7789) - it uses specific GPIO pins and SPI 0.1
-        pirate_audio_detected = False
-        try:
-            # Pirate Audio has these characteristics:
-            # 1. Uses SPI device 0.1
-            # 2. Has buttons on GPIO 5, 6, 16, 24
-            # 3. Has backlight on GPIO 13
-            
-            if '0.1' not in spi_devices:
-                logger.info("SPI 0.1 not found, Pirate Audio unlikely")
-            else:
-                import RPi.GPIO as GPIO
-                
-                # Check for ST7789 module availability
-                try:
-                    import st7789
-                    
-                    # Verify ST7789 hardware is present with a more rigorous check
-                    # Make sure ALL button pins are accessible and backlight pin works
-                    pirate_buttons = [5, 6, 16, 24]  # A, B, X, Y buttons
-                    buttons_accessible = True
-                    
-                    # Try to setup each button pin
-                    for pin in pirate_buttons:
-                        try:
-                            GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-                            GPIO.cleanup(pin)
-                        except Exception as e:
-                            logger.warning(f"Could not access Pirate Audio button on GPIO {pin}: {e}")
-                            buttons_accessible = False
-                            break
-                    
-                    # Only proceed if all buttons were accessible
-                    if buttons_accessible:
-                        # Check backlight pin
-                        try:
-                            GPIO.setup(13, GPIO.OUT, initial=GPIO.LOW)
-                            GPIO.output(13, GPIO.HIGH)
-                            time.sleep(0.1)
-                            GPIO.output(13, GPIO.LOW)
-                            GPIO.cleanup(13)
-                            
-                            logger.info("ST7789 hardware detected (Pirate Audio)")
-                            pirate_audio_detected = True
-                            possible_displays.append("st7789")
-                        except Exception as e:
-                            logger.warning(f"ST7789 backlight control failed: {e}")
-                            logger.info("Pirate Audio detection inconclusive - backlight control failed")
-                except ImportError:
-                    logger.warning("ST7789 module not available")
-        except Exception as e:
-            logger.warning(f"Error during Pirate Audio detection: {e}")
-        
-        # Clean up any GPIO settings
-        try:
-            import RPi.GPIO as GPIO
-            GPIO.cleanup()
-        except:
-            pass
-        
-        # Make the final decision based on what we found
-        if waveshare_detected:
-            logger.info("Selecting SH1106 SPI display (Waveshare OLED)")
-            return "sh1106_spi"
-        elif pirate_audio_detected:
-            logger.info("Selecting ST7789 display (Pirate Audio)")
-            return "st7789"
-        elif possible_displays:
-            logger.info(f"Using first detected display from list: {possible_displays[0]}")
-            return possible_displays[0]
-        else:
-            logger.warning("No supported display detected")
-            return "none"
+        # If we got here, no display was reliably detected
+        logger.warning("No display could be reliably detected")
+        return "none"
         
     except Exception as e:
         logger.error(f"Error during display detection: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return "none"
-
-display_type = determine_display_type()
-oledEnabled = (display_type == "sh1106" or display_type == "sh1106_i2c" or display_type == "sh1106_spi")
-st7789Enabled = (display_type == "st7789")
-
-logger.info(f"Display detection result: {display_type}")
-
-if st7789Enabled:
-    import st7789
-    from PIL import Image, ImageDraw, ImageFont
-    # Pirate Audio display is 240x240 pixels, so we can use larger fonts
-    st_fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 18)
-    st_fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 14)
-    logger.info("ST7789 Display initialized (Pirate Audio)")
-elif oledEnabled:
-    import SH1106
-    from PIL import Image, ImageDraw, ImageFont
-    fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 10)
-    fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 9)
-    logger.info("SH1106 OLED Display initialized (WaveShare)")
 
 store_dev = '/dev/mmcblk0p3'
 store_mnt = '/mnt/imgstore'
@@ -1044,7 +971,7 @@ def getDisplayInput():
                     logger.info("OLED display cleared")
                 except Exception as e:
                     logger.error(f"Error turning off OLED display: {e}")
-        
+
         # Handle display updates separately from button presses
         should_update = False
         with update_lock:
@@ -1485,19 +1412,24 @@ def updateST7789Display_FileS(display, iterator, file_list):
     draw.line([(arrow_x, arrow_y-8), (arrow_x, arrow_y+12)], fill=(0, 0, 0), width=3)
     draw.line([(arrow_x-8, arrow_y), (arrow_x, arrow_y+12), (arrow_x+8, arrow_y)], fill=(0, 0, 0), width=3)
     
-    # Y button - Green checkmark (for OK) - FIXED: switched Y and X positions
-    draw.text((132, 200), "Y", font=st_fontS, fill=(255, 255, 255))
-    # Draw checkmark
-    check_x, check_y = 150, 210
-    draw.line([(check_x-10, check_y), (check_x, check_y+10), (check_x+15, check_y-15)], 
-              fill=(0, 255, 0), width=3)
+    # X button - Advanced menu (three horizontal lines, larger)
+    draw.text((132, 200), "X", font=st_fontS, fill=(255, 255, 255))
+    # Draw three lines
+    menu_x, menu_y = 150, 200
+    draw.line([(menu_x, menu_y+1), (menu_x+20, menu_y+1)], fill=(0, 0, 0), width=3)
+    draw.line([(menu_x, menu_y+8), (menu_x+20, menu_y+8)], fill=(0, 0, 0), width=3)
+    draw.line([(menu_x, menu_y+15), (menu_x+20, menu_y+15)], fill=(0, 0, 0), width=3)
     
-    # X button - Red X (for Cancel) - FIXED: switched X and Y positions
-    draw.text((192, 200), "X", font=st_fontS, fill=(255, 255, 255))
-    # Draw X
-    x_x, x_y = 210, 205
-    draw.line([(x_x-10, x_y-10), (x_x+10, x_y+10)], fill=(255, 0, 0), width=3)
-    draw.line([(x_x+10, x_y-10), (x_x-10, x_y+10)], fill=(255, 0, 0), width=3)
+    # Y button - ISO selection (folder icon instead of CD)
+    draw.text((192, 200), "Y", font=st_fontS, fill=(255, 255, 255))
+    # Draw folder icon
+    folder_x, folder_y = 210, 198
+    # Folder base
+    draw.rectangle([(folder_x, folder_y+5), (folder_x+20, folder_y+20)], 
+                  outline=(0, 0, 0), fill=(255, 223, 128), width=2)
+    # Folder tab
+    draw.rectangle([(folder_x+2, folder_y), (folder_x+10, folder_y+5)], 
+                  outline=(0, 0, 0), fill=(255, 223, 128), width=2)
     
     display.display(image)
 
@@ -1602,6 +1534,7 @@ def changeST7789ISO(display):
     cancel_button = 16  # Button X 
     select_button = 24  # Button Y
     
+       
     # Track button states
     last_states = {
         up_button: 1,
@@ -1857,39 +1790,34 @@ def diagnose_display_hardware():
     logger.info("=========== END OF DIAGNOSTICS ===========")
     
 def determine_display_type():
-    """Determine display type from config or autodetection"""
-    # Load configuration
-    config = load_config()
-    display_setting = config.get('display', 'auto').lower()
-    
-    logger.info(f"Display setting from config: {display_setting}")
-    
-    # If display is explicitly set in the config file, use that
-    if display_setting != 'auto':
-        if display_setting == 'waveshare' or display_setting == 'sh1106_spi':
-            logger.info("Using Waveshare OLED display (SPI) from config file")
-            return "sh1106_spi"
-        elif display_setting == 'waveshare-i2c' or display_setting == 'sh1106_i2c':
-            logger.info("Using Waveshare OLED display (I2C) from config file")
-            return "sh1106_i2c"
-        elif display_setting == 'pirateaudio' or display_setting == 'st7789':
-            logger.info("Using Pirate Audio display (ST7789) from config file")
-            return "st7789"
-        elif display_setting == 'none' or display_setting == 'disabled':
-            logger.info("Displays disabled in config file")
-            return "none"
-        else:
-            logger.warning(f"Unknown display type in config: {display_setting}, falling back to auto-detection")
-    
-    # Otherwise fall back to auto-detection
-    logger.info("No display specified in config file, using auto-detection")
+    """Determine display type using safer detection methods"""
     return detect_display_type()
 
 def main():
     #Setup Environment
     global exitRequested
     logger.info("Starting USBODE...")
-    
+
+    display_type = determine_display_type()
+    oledEnabled = (display_type == "sh1106" or display_type == "sh1106_i2c" or display_type == "sh1106_spi")
+    st7789Enabled = (display_type == "st7789")
+
+    logger.info(f"Display detection result: {display_type}")
+
+    if st7789Enabled:
+        import st7789
+        from PIL import Image, ImageDraw, ImageFont
+        # Pirate Audio display is 240x240 pixels, so we can use larger fonts
+        st_fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 18)
+        st_fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 14)
+        logger.info("ST7789 Display initialized (Pirate Audio)")
+    elif oledEnabled:
+        import SH1106
+        from PIL import Image, ImageDraw, ImageFont
+        fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 10)
+        fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 9)
+        logger.info("SH1106 OLED Display initialized (WaveShare)")
+
     # Create sample configuration file if it doesn't exist
     create_sample_config()
     
