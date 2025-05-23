@@ -56,19 +56,61 @@ sys.path.append(f"{ScriptPath}/waveshare")
 global oledEnabled
 global fontM
 global fontS
+global fontTiny
 global fontL
 global st7789Enabled
 oledEnabled = False
 st7789Enabled = False
 
+def read_display_config():
+    """
+    Read display configuration from /boot/firmware/usbode.conf
+    Returns the configured display type: 'waveshare', 'waveshare-spi', or 'pirateaudio'
+    Defaults to 'waveshare' if file doesn't exist or no display setting is found
+    """
+    config_file = '/boot/firmware/usbode.conf'
+    default_display = 'waveshare'
+    
+    try:
+        if os.path.exists(config_file):
+            with open(config_file, 'r') as f:
+                for line in f:
+                    # Remove comments and trim whitespace
+                    line = line.split('#', 1)[0].strip()
+                    
+                    # Look for display=X setting
+                    if line.startswith('display='):
+                        display_setting = line.split('=', 1)[1].strip().lower()
+                        
+                        # Validate display setting
+                        if display_setting in ['waveshare', 'waveshare-spi', 'pirateaudio']:
+                            logger.info(f"Using display configuration from {config_file}: {display_setting}")
+                            return display_setting
+                        elif display_setting == 'none':
+                            logger.info("Display disabled in configuration file")
+                            return 'none'
+                        else:
+                            logger.warning(f"Unknown display setting in {config_file}: {display_setting}")
+            
+            logger.info(f"No valid display setting found in {config_file}, using default: {default_display}")
+        else:
+            logger.info(f"Config file {config_file} not found, using default display: {default_display}")
+    
+    except Exception as e:
+        logger.error(f"Error reading display configuration: {e}")
+    
+    return default_display
+display_type = read_display_config()
+
 try:
-    import st7789
-    from PIL import Image, ImageDraw, ImageFont
-    st7789Enabled = True
-    # Pirate Audio display is 240x240 pixels, so we can use larger fonts
-    st_fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 18)
-    st_fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 14)
-    logger.info("ST7789 Display Enabled (Pirate Audio)")
+    if display_type == 'pirateaudio':
+        import st7789
+        from PIL import Image, ImageDraw, ImageFont
+        st7789Enabled = True
+        # Pirate Audio display is 240x240 pixels, so we can use larger fonts
+        st_fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 18)
+        st_fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 14)
+        logger.info("ST7789 Display Enabled (Pirate Audio)")
 except Exception as e:
     logger.warning(f"Failed to import ST7789: {e}, Pirate Audio display will not be used.")
     st7789Enabled = False
@@ -81,6 +123,7 @@ if not st7789Enabled:
         oledEnabled = True
         fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 10)
         fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 9)
+        fontTiny = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 6)
         logger.info("WaveShare Display Enabled")
     except Exception as e:
         logger.warning(f"Failed to import SH1106 or PIL: {e}, waveshare display will not be used.")
@@ -578,19 +621,143 @@ def changeISO_OLED(disp):
 def updateDisplay_FileS(disp, iterator, file_list):
     image1 = Image.new('1', (disp.width, disp.height), "WHITE")
     draw = ImageDraw.Draw(image1)
-    draw.text((0, 0), "Select an ISO:", font = fontL, fill = 0 )
-    draw.text((0, 12), "I: " + str.replace(getMountedCDName(),store_mnt+'/',''), font = fontL, fill = 0 )
-    draw.text((1,25), file_list[iterator], font = fontL, fill = 0 )
-    draw.line([(0,37),(127,37)], fill = 0)
+    
+    # Move "Select an ISO" text up slightly
+    draw.text((0, -2), "Select an ISO:", font=fontL, fill=0)
+    
+    # Current ISO with two-line support
+    current_iso = str.replace(getMountedCDName(), store_mnt+'/', '')
+    
+    # First line has "I: " prefix, so fewer characters per line
+    first_line_chars = 18
+    # Second line and selection lines have no prefix, so can use more characters
+    chars_per_line = 21
+    
+    if len(current_iso) <= first_line_chars:
+        # Short name fits on one line
+        draw.text((0, 10), "I: " + current_iso, font=fontL, fill=0)
+    else:
+        # Name needs two lines
+        draw.text((0, 10), "I: " + current_iso[:first_line_chars], font=fontL, fill=0)
+        
+        # If name is very long, ensure last 11 chars are visible
+        if len(current_iso) > first_line_chars + chars_per_line - 12:
+            remaining_chars = chars_per_line - 12  # Space for "…" and last 11 chars
+            second_line = current_iso[first_line_chars:first_line_chars+remaining_chars] + "…" + current_iso[-11:]
+        else:
+            second_line = current_iso[first_line_chars:]
+            
+        draw.text((0, 20), second_line, font=fontL, fill=0)
+    
+    # Divider line after current ISO - position depends on whether we used one or two lines
+    line_y = 22 if len(current_iso) <= first_line_chars else 32
+    draw.line([(0, line_y), (127, line_y)], fill=0)
+    
+    # New ISO selection with two-line support
+    selected_file = file_list[iterator]
+    
+    # Position for new selection depends on line_y
+    selection_y = line_y + 3
+    
+    if len(selected_file) <= chars_per_line:
+        # Short name fits on one line
+        draw.text((0, selection_y), selected_file, font=fontL, fill=0)
+    else:
+        # Name needs two lines
+        draw.text((0, selection_y), selected_file[:chars_per_line], font=fontL, fill=0)
+        
+        # If name is very long, ensure last 11 chars are visible
+        if len(selected_file) > chars_per_line * 2 - 12:
+            remaining_chars = chars_per_line - 12  # Space for "…" and last 11 chars
+            second_line = selected_file[chars_per_line:chars_per_line+remaining_chars] + "…" + selected_file[-11:]
+        else:
+            second_line = selected_file[chars_per_line:]
+            
+        draw.text((0, selection_y + 10), second_line, font=fontL, fill=0)
+    
+    # Removed file position indicator completely to avoid text overflow
+    
     disp.ShowImage(disp.getbuffer(image1))
 
 def updateDisplay(disp):
     image1 = Image.new('1', (disp.width, disp.height), "WHITE")
     draw = ImageDraw.Draw(image1)
-    draw.text((0, 0), "USBODE v:" + versionNum, font = fontL, fill = 0 )
-    draw.text((0, 12), "IP: " + myIPAddress, font = fontL, fill = 0 )
-    draw.text((0, 24), "ISO: " + str.replace(getMountedCDName(),store_mnt+'/',''), font = fontL, fill = 0 )
-    draw.text((0, 36), "Mode: " + str(checkState()), font = fontL, fill = 0 )
+    
+    # Header - moved up to save space
+    draw.text((0, -2), "USBODE v:" + versionNum, font=fontL, fill=0)
+    
+    # Draw mini WiFi icon
+    wifi_x, wifi_y = 0, 12
+    # Draw small WiFi icon - simplified for OLED's lower resolution
+    # Outer arc
+    draw.arc([(wifi_x, wifi_y), (wifi_x + 8, wifi_y + 8)], 
+            225, 315, fill=0, width=1)
+    # Inner arc
+    draw.arc([(wifi_x + 2, wifi_y + 2), (wifi_x + 6, wifi_y + 6)], 
+            225, 315, fill=0, width=1)
+    # Center dot
+    draw.ellipse([(wifi_x + 3, wifi_y + 3), (wifi_x + 5, wifi_y + 5)], fill=0)
+    
+    # IP address
+    draw.text((10, 10), myIPAddress, font=fontL, fill=0)
+    
+    # Draw CD icon
+    cd_x, cd_y = 0, 23
+    cd_radius = 5
+    # Outer circle
+    draw.ellipse([(cd_x, cd_y), (cd_x + 2*cd_radius, cd_y + 2*cd_radius)], 
+                outline=0)
+    # Inner circle (hole)
+    draw.ellipse([(cd_x + cd_radius - 1, cd_y + cd_radius - 1), 
+                (cd_x + cd_radius + 1, cd_y + cd_radius + 1)], 
+                outline=0)
+    
+    # ISO name with two-line support and guaranteed ending
+    iso_name = str.replace(getMountedCDName(), store_mnt+'/', '')
+    
+    # First line has offset due to CD icon, so fewer characters per line
+    first_line_chars = 17  # Slightly less than before to account for the CD icon
+    # Second line has no offset, so can use more characters
+    second_line_chars = 21
+    
+    if len(iso_name) <= first_line_chars:
+        # Short name fits on one line
+        draw.text((12, 23), iso_name, font=fontL, fill=0)
+    else:
+        # Name needs two lines
+        draw.text((12, 23), iso_name[:first_line_chars], font=fontL, fill=0)
+        
+        if len(iso_name) > first_line_chars + second_line_chars - 12:
+            # Very long name, ensure last 11 chars are visible using ellipsis
+            remaining_chars = second_line_chars - 12  # Space for "…" and last 11 chars
+            second_line = iso_name[first_line_chars:first_line_chars+remaining_chars] + "…" + iso_name[-11:]
+        else:
+            second_line = iso_name[first_line_chars:]
+            
+        draw.text((0, 33), second_line, font=fontL, fill=0)
+    
+    # Draw USB icon and mode - moved down to give more space for ISO name
+    # USB icon is now twice as large and rotated 90 degrees clockwise
+    usb_x = 0
+    usb_y = 45
+    
+    # Draw standard USB icon (larger and rotated 90 degrees clockwise)
+    # Horizontal line (was vertical)
+    draw.line([(usb_x, usb_y + 4), (usb_x + 10, usb_y + 4)], fill=0, width=1)
+    # Circle at left (was top)
+    draw.ellipse([(usb_x - 4, usb_y + 2), (usb_x, usb_y + 6)], outline=0)
+    # Top arm (was right)
+    draw.line([(usb_x + 2, usb_y + 4), (usb_x + 2, usb_y)], fill=0, width=1)
+    draw.line([(usb_x + 2, usb_y), (usb_x + 6, usb_y)], fill=0, width=1)
+    # Bottom arm (was left)
+    draw.line([(usb_x + 6, usb_y + 4), (usb_x + 6, usb_y + 8)], fill=0, width=1)
+    draw.line([(usb_x + 6, usb_y + 8), (usb_x + 10, usb_y + 8)], fill=0, width=1)
+    
+    # Mode number and text
+    mode = checkState()
+    mode_text = "(CD)" if mode == 1 else "(ExFAT)" if mode == 2 else ""
+    draw.text((15, 45), f"{mode} {mode_text}", font=fontL, fill=0)
+    
     disp.ShowImage(disp.getbuffer(image1))
 
 def updateDisplay_Advanced(disp):
@@ -994,7 +1161,7 @@ def updateST7789Display(display):
                  fill=(0, 0, 0))
     
     # Draw IP address after WiFi icon
-    draw.text((35, 40), myIPAddress, font=st_fontL, fill=(0, 0, 0))
+    draw.text((35, wifi_y), myIPAddress, font=st_fontL, fill=(0, 0, 0))
     
     # Draw CD icon (simple circle with hole and shine)
     cd_x, cd_y = 10, 70
@@ -1028,45 +1195,47 @@ def updateST7789Display(display):
             draw.text((10, 90), line2, font=st_fontL, fill=(0, 0, 0))
             
             if len(iso_name) > chars_per_line*2:
-                # Special handling for long filenames
+                # Fixed: Handle third line with proper ellipsis using Unicode character
                 if len(iso_name) > chars_per_line*3:
-                    # If we can't show the full name in 3 lines, show start, middle ellipsis, and end
-                    # Show the last 11 characters as requested
-                    last_part = iso_name[-11:] if len(iso_name) >= 11 else iso_name
-                    # Show ellipsis in the middle
-                    line3 = iso_name[chars_per_line*2:chars_per_line*3-14] + "..." + last_part
-                    draw.text((10, 110), line3, font=st_fontL, fill=(0, 0, 0))
+                    # Show first 8 characters of third section (more with single ellipsis)
+                    first_part = iso_name[chars_per_line*2:chars_per_line*2+8]
+                    # Show the last 12 characters of the filename (more with single ellipsis)
+                    last_part = iso_name[-12:]
+                    # Combine with Unicode ellipsis character
+                    line3 = first_part + "…" + last_part
                 else:
                     # If it fits in exactly 3 lines, just show the third line
                     line3 = iso_name[chars_per_line*2:]
-                    draw.text((10, 110), line3, font=st_fontL, fill=(0, 0, 0))
+                    
+                draw.text((10, 110), line3, font=st_fontL, fill=(0, 0, 0))
     
     # Draw mode indicator line with only the state number and icons (no "Mode:" text)
     mode = checkState()
     
-    # Draw USB icon
+    # Draw USB icon - UPDATED to match OLED display style (rotated 90° with larger size)
     usb_x = 10
     usb_y = 155
     
-    # USB connector body
-    draw.rectangle([(usb_x, usb_y + 2), (usb_x + 10, usb_y + 14)], 
-                 fill=(50, 50, 50), outline=(0, 0, 0))
-    # USB prongs
-    draw.rectangle([(usb_x + 3, usb_y), (usb_x + 7, usb_y + 3)], 
-                 fill=(200, 200, 200), outline=(0, 0, 0))
-    # USB symbol
-    draw.ellipse([(usb_x + 3, usb_y + 4), (usb_x + 7, usb_y + 8)], 
-                outline=(255, 255, 255))
-    draw.line([(usb_x + 5, usb_y + 8), (usb_x + 5, usb_y + 12)], 
-             fill=(255, 255, 255))
-    draw.line([(usb_x + 3, usb_y + 10), (usb_x + 7, usb_y + 10)], 
-             fill=(255, 255, 255))
+    # Draw standard USB icon (larger and rotated 90 degrees clockwise like the OLED display)
+    # Horizontal line (main stem)
+    draw.line([(usb_x, usb_y + 8), (usb_x + 20, usb_y + 8)], fill=(0, 0, 0), width=2)
+    
+    # Circle at left
+    draw.ellipse([(usb_x - 6, usb_y + 4), (usb_x + 2, usb_y + 12)], outline=(0, 0, 0), width=2)
+    
+    # Top arm
+    draw.line([(usb_x + 6, usb_y + 8), (usb_x + 6, usb_y)], fill=(0, 0, 0), width=2)
+    draw.line([(usb_x + 6, usb_y), (usb_x + 14, usb_y)], fill=(0, 0, 0), width=2)
+    
+    # Bottom arm
+    draw.line([(usb_x + 14, usb_y + 8), (usb_x + 14, usb_y + 16)], fill=(0, 0, 0), width=2)
+    draw.line([(usb_x + 14, usb_y + 16), (usb_x + 22, usb_y + 16)], fill=(0, 0, 0), width=2)
     
     # Draw mode number
-    draw.text((30, 155), f"{mode}", font=st_fontL, fill=(0, 0, 0))
+    draw.text((40, 155), f"{mode}", font=st_fontL, fill=(0, 0, 0))
     
     # Position for mode icon
-    mode_icon_x = 50
+    mode_icon_x = 60
     mode_icon_y = 155
     
     if mode == 1:  # CD-Emulator mode - draw CD icon
@@ -1143,7 +1312,7 @@ def updateST7789Display(display):
                   outline=(0, 0, 0), fill=(255, 223, 128), width=2)
     
     display.display(image)
-
+    
 def updateST7789Display_FileS(display, iterator, file_list):
     """Show file selection screen on ST7789 display"""
     image = Image.new('RGB', (display.width, display.height), color=(255, 255, 255))
@@ -1167,51 +1336,69 @@ def updateST7789Display_FileS(display, iterator, file_list):
     draw.arc([(cd_x + 2, cd_y + 2), (cd_x + 2*cd_radius - 4, cd_y + 2*cd_radius - 4)], 
             45, 180, fill=(255, 255, 255), width=1)
     
-    # Show first 8 and last 8 characters of current ISO name
+    # Show current ISO name with more characters (up to 25) since we're using smaller font
     current_iso = str.replace(getMountedCDName(), store_mnt+'/', '')
-    if len(current_iso) > 16:  # If longer than 16 chars, show first 8 + "..." + last 8
-        current_iso_display = current_iso[:8] + "..." + current_iso[-8:]
+    if len(current_iso) > 25:  # If longer than 25 chars, show first 10 + "…" + last 10
+        current_iso_display = current_iso[:12] + "…" + current_iso[-12:]  # Using Unicode ellipsis character
     else:
         current_iso_display = current_iso  # If short enough, show the whole thing
         
     draw.text((35, 40), current_iso_display, font=st_fontS, fill=(0, 0, 0))
     
-    # Draw selection with multi-line support for long filenames
-    draw.rectangle([(0, 70), (240, 130)], fill=(187, 222, 251))
+    # Determine if we need 1, 2 or 3 lines for selected file display
     selected_file = file_list[iterator]
+    chars_per_line = 21  # Characters per line
     
-    # Handle multi-line display of filename with guaranteed ending
-    chars_per_line = 25  # Characters that fit on one line
+    # Calculate how many lines we need and adjust the blue box height accordingly
     if len(selected_file) <= chars_per_line:
-        # Single line display
-        draw.text((10, 90), selected_file, font=st_fontL, fill=(0, 0, 0))
+        # Single line display - smaller box
+        draw.rectangle([(0, 70), (240, 115)], fill=(187, 222, 251))
+        draw.text((10, 85), selected_file, font=st_fontL, fill=(0, 0, 0))
+    elif len(selected_file) <= chars_per_line * 2:
+        # Two line display - medium box
+        draw.rectangle([(0, 70), (240, 130)], fill=(187, 222, 251))
+        line1 = selected_file[:chars_per_line]
+        line2 = selected_file[chars_per_line:]
+        draw.text((10, 80), line1, font=st_fontL, fill=(0, 0, 0))
+        draw.text((10, 105), line2, font=st_fontL, fill=(0, 0, 0))
     else:
-        # For long filenames, ensure the last 11 characters are always shown
-        if len(selected_file) > chars_per_line*2 - 3:
-            # Very long filename - need to show start, ellipsis, and end
-            last_part = selected_file[-11:] if len(selected_file) >= 11 else selected_file
-            first_part = selected_file[:chars_per_line]
-            middle_part = selected_file[chars_per_line:chars_per_line*2-14]
-            
-            # First line
-            draw.text((10, 80), first_part, font=st_fontL, fill=(0, 0, 0))
-            
-            # Second line with ellipsis and ending
-            second_line = middle_part + "..." + last_part
-            draw.text((10, 105), second_line, font=st_fontL, fill=(0, 0, 0))
+        # Three line display - taller box
+        draw.rectangle([(0, 70), (240, 150)], fill=(187, 222, 251))
+        line1 = selected_file[:chars_per_line]
+        line2 = selected_file[chars_per_line:chars_per_line*2]
+        
+        # For the third line, ensure we don't have overlapping content with ellipsis
+        if len(selected_file) > chars_per_line * 3:
+            # Show first 8 characters of third section (more with single ellipsis)
+            first_part = selected_file[chars_per_line*2:chars_per_line*2+8]
+            # Show the last 12 characters of the filename (more with single ellipsis)
+            last_part = selected_file[-12:]
+            # Combine with ellipsis - using Unicode ellipsis character
+            line3 = first_part + "…" + last_part
         else:
-            # Fits in two lines without ellipsis
-            line1 = selected_file[:chars_per_line]
-            line2 = selected_file[chars_per_line:]
-            draw.text((10, 80), line1, font=st_fontL, fill=(0, 0, 0))
-            draw.text((10, 105), line2, font=st_fontL, fill=(0, 0, 0))
+            # If it fits in exactly 3 lines, just show the remaining text
+            line3 = selected_file[chars_per_line*2:]
+            
+        draw.text((10, 75), line1, font=st_fontL, fill=(0, 0, 0))
+        draw.text((10, 100), line2, font=st_fontL, fill=(0, 0, 0))
+        draw.text((10, 125), line3, font=st_fontL, fill=(0, 0, 0))
     
-    # Position indicator (N of Total)
+    # Position indicator (N of Total) - moved down to avoid overlap with filename
+    # Always position it below the blue box
     total_files = len(file_list)
     position_text = f"File {iterator+1} of {total_files}"
-    draw.text((10, 140), position_text, font=st_fontS, fill=(0, 0, 0))
     
-    # Show navigation help with larger icons to match other screens
+    if len(selected_file) <= chars_per_line:
+        # For single line, position counter at y=125
+        draw.text((10, 125), position_text, font=st_fontS, fill=(0, 0, 0))
+    elif len(selected_file) <= chars_per_line * 2:
+        # For two lines, position counter at y=140
+        draw.text((10, 140), position_text, font=st_fontS, fill=(0, 0, 0))
+    else:
+        # For three lines, position counter at y=160
+        draw.text((10, 160), position_text, font=st_fontS, fill=(0, 0, 0))
+    
+    # Draw navigation buttons - always at the bottom
     draw.rectangle([(0, 190), (240, 240)], fill=(58, 124, 165))
     
     # A button - Up arrow (larger)
@@ -1228,19 +1415,24 @@ def updateST7789Display_FileS(display, iterator, file_list):
     draw.line([(arrow_x, arrow_y-8), (arrow_x, arrow_y+12)], fill=(0, 0, 0), width=3)
     draw.line([(arrow_x-8, arrow_y), (arrow_x, arrow_y+12), (arrow_x+8, arrow_y)], fill=(0, 0, 0), width=3)
     
-    # Y button - Green checkmark (for OK) - FIXED: switched Y and X positions
-    draw.text((132, 200), "Y", font=st_fontS, fill=(255, 255, 255))
-    # Draw checkmark
-    check_x, check_y = 150, 210
-    draw.line([(check_x-10, check_y), (check_x, check_y+10), (check_x+15, check_y-15)], 
-              fill=(0, 255, 0), width=3)
+    # X button - Advanced menu (three horizontal lines, larger)
+    draw.text((132, 200), "X", font=st_fontS, fill=(255, 255, 255))
+    # Draw three lines
+    menu_x, menu_y = 150, 200
+    draw.line([(menu_x, menu_y+1), (menu_x+20, menu_y+1)], fill=(0, 0, 0), width=3)
+    draw.line([(menu_x, menu_y+8), (menu_x+20, menu_y+8)], fill=(0, 0, 0), width=3)
+    draw.line([(menu_x, menu_y+15), (menu_x+20, menu_y+15)], fill=(0, 0, 0), width=3)
     
-    # X button - Red X (for Cancel) - FIXED: switched X and Y positions
-    draw.text((192, 200), "X", font=st_fontS, fill=(255, 255, 255))
-    # Draw X
-    x_x, x_y = 210, 205
-    draw.line([(x_x-10, x_y-10), (x_x+10, x_y+10)], fill=(255, 0, 0), width=3)
-    draw.line([(x_x+10, x_y-10), (x_x-10, x_y+10)], fill=(255, 0, 0), width=3)
+    # Y button - ISO selection (folder icon instead of CD)
+    draw.text((192, 200), "Y", font=st_fontS, fill=(255, 255, 255))
+    # Draw folder icon
+    folder_x, folder_y = 210, 198
+    # Folder base
+    draw.rectangle([(folder_x, folder_y+5), (folder_x+20, folder_y+20)], 
+                  outline=(0, 0, 0), fill=(255, 223, 128), width=2)
+    # Folder tab
+    draw.rectangle([(folder_x+2, folder_y), (folder_x+10, folder_y+5)], 
+                  outline=(0, 0, 0), fill=(255, 223, 128), width=2)
     
     display.display(image)
 
@@ -1464,8 +1656,38 @@ def handleST7789AdvancedMenu(display):
                 return True
             elif selected_item == 1:  # Shutdown
                 logger.info("Advanced menu: shutting down")
+                
+                # Show shutdown screen before initiating shutdown
+                image = Image.new('RGB', (display.width, display.height), color=(0, 0, 0))
+                draw = ImageDraw.Draw(image)
+                
+                # Draw centered shutdown message
+                message = "Shutting down..."
+                font = st_fontL
+                text_width, text_height = draw.textsize(message, font=font)
+                position = ((display.width - text_width) // 2, (display.height - text_height) // 2)
+                draw.text(position, message, font=font, fill=(255, 255, 255))
+                
+                # Draw logo or icon above text
+                logo_y = position[1] - 40
+                # Draw a power icon (circle with line at top)
+                power_x, power_y = display.width // 2, logo_y
+                power_radius = 15
+                # Draw circle
+                draw.ellipse([(power_x - power_radius, power_y - power_radius), 
+                             (power_x + power_radius, power_y + power_radius)], 
+                            outline=(255, 255, 255), width=2)
+                # Draw power line
+                draw.line([(power_x, power_y - power_radius - 10), (power_x, power_y)], 
+                         fill=(255, 255, 255), width=2)
+                
+                display.display(image)
+                time.sleep(1)  # Show shutdown screen for a moment
+                
+                # Now initiate shutdown
                 requests.request('GET', 'http://127.0.0.1/shutdown')
                 return True
+            
             last_states[select_button] = 1
 
 def main():
