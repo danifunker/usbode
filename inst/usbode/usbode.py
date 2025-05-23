@@ -57,16 +57,34 @@ global oledEnabled
 global fontM
 global fontS
 global fontL
+global st7789Enabled
+oledEnabled = False
+st7789Enabled = False
+
 try:
-    import SH1106
+    import st7789
     from PIL import Image, ImageDraw, ImageFont
-    oledEnabled = True
-    fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf",10)
-    fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf",9)
-    logger.info("WaveShare Display Enabled")
+    st7789Enabled = True
+    # Pirate Audio display is 240x240 pixels, so we can use larger fonts
+    st_fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 18)
+    st_fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 14)
+    logger.info("ST7789 Display Enabled (Pirate Audio)")
 except Exception as e:
-    logger.warning(f"Failed to import SH1106 or PIL: {e}, waveshare display will not be used.")
-    oledEnabled = False
+    logger.warning(f"Failed to import ST7789: {e}, Pirate Audio display will not be used.")
+    st7789Enabled = False
+
+# Only try to import SH1106 if ST7789 is not available to avoid pin conflicts
+if not st7789Enabled:
+    try:
+        import SH1106
+        from PIL import Image, ImageDraw, ImageFont
+        oledEnabled = True
+        fontL = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 10)
+        fontS = ImageFont.truetype(f"{ScriptPath}/waveshare/Font.ttf", 9)
+        logger.info("WaveShare Display Enabled")
+    except Exception as e:
+        logger.warning(f"Failed to import SH1106 or PIL: {e}, waveshare display will not be used.")
+        oledEnabled = False
 
 store_dev = '/dev/mmcblk0p3'
 store_mnt = '/mnt/imgstore'
@@ -436,10 +454,24 @@ def change_Loaded_Mount(filename):
         return True
 
 def start_exit():
-    global disp
-    global oledEnabled
-    if oledEnabled:
-        stopPiOled()   
+    global disp, st_disp, exitRequested, oledEnabled, st7789Enabled
+    exitRequested = 1
+    
+    if st7789Enabled:
+        try:
+            import RPi.GPIO as GPIO
+            GPIO.cleanup()
+            logger.info("ST7789 GPIO cleaned up")
+        except Exception as e:
+            logger.error(f"Error cleaning up GPIO: {e}")
+            
+    elif oledEnabled:
+        try:
+            disp.RPI.module_exit()
+            logger.info("OLED display stopped")
+        except Exception as e:
+            logger.error(f"Error stopping OLED: {e}")
+            
     disable_gadget()
     cleanupMode()
     logger.info(subprocess.run(['rmmod', 'usb_f_mass_storage'], capture_output=True, text=True))
@@ -594,65 +626,161 @@ def showLEDLights():
     os.system('echo 1 > /sys/class/leds/ACT/brightness') # led on
 
 
-def getOLEDinput():
-    global disp, exitRequested, updateEvent
+def getDisplayInput():
+    global disp, st_disp, exitRequested, updateEvent, oledEnabled, st7789Enabled
     
-    # Button pins to monitor
-    button_pins = [
-        disp.RPI.GPIO_KEY3_PIN,  # Mode button
-        disp.RPI.GPIO_KEY2_PIN,  # Advanced menu button
-        disp.RPI.GPIO_KEY1_PIN   # OK button
-    ]
+    # Set up appropriate display and buttons based on what's available
+    if st7789Enabled:
+        logger.info("Initializing ST7789 display")
+        # GPIO mode is already set at import time, no need to set again
+        st_disp = init_st7789()
+        
+        # Pirate Audio buttons (GPIO numbers)
+        # 5 = Up, 6 = Down, 16 = Mode (KEY1), 24 = Advanced (KEY2)
+        import RPi.GPIO as GPIO
+        
+        # Pirate Audio buttons
+        st_button_pins = [16, 24, 5, 6]  # Mode, Advanced, Up, Down
+        for pin in st_button_pins:
+            GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        
+        # Initial display update for ST7789
+        if st_disp:
+            updateST7789Display(st_disp)
     
-    # Button state tracking for debouncing
-    last_button_states = {pin: 1 for pin in button_pins}  # 1 = released, 0 = pressed
+    # Check waveshare OLED buttons if enabled
+    if oledEnabled:
+        logger.info("Initializing SH1106 OLED display")
+        disp = SH1106.SH1106()
+        disp.Init()
+        disp.clear()
+        
+        # SH1106 buttons from waveshare
+        button_pins = [
+            disp.RPI.GPIO_KEY3_PIN,  # Mode button
+            disp.RPI.GPIO_KEY2_PIN,  # Advanced menu button
+            disp.RPI.GPIO_KEY1_PIN   # OK button
+        ]
+        
+        # Initial display update
+        updateDisplay(disp)
+    
+    # Button state tracking for debouncing (works for both display types)
+    last_button_states = {}
     debounce_time = 0.2  # seconds
-    last_press_time = {pin: 0 for pin in button_pins}
+    last_press_time = {}
     
-    # Initialize display
-    disp.Init()
-    disp.clear()
-    updateDisplay(disp)
+    # Initialize button states for appropriate display
+    if oledEnabled:
+        for pin in button_pins:
+            last_button_states[pin] = 1  # 1 = released, 0 = pressed
+            last_press_time[pin] = 0
     
-    # Track last update time to periodically check status
+    if st7789Enabled:
+        for pin in st_button_pins:
+            last_button_states[pin] = 1  # 1 = released, 0 = pressed
+            last_press_time[pin] = 0
+    
+    # Track last update time for periodic updates
     last_update_time = time.time()
     update_interval = 5  # Check for updates every 5 seconds
     
     while not exitRequested:
         current_time = time.time()
         
-        # Check button states
-        for i, pin in enumerate(button_pins):
-            current_state = disp.RPI.digital_read(pin)
-            
-            # Button press detected (transition from 1 to 0)
-            if current_state == 0 and last_button_states[pin] == 1:
-                last_button_states[pin] = 0
+        # Check waveshare OLED buttons if enabled
+        if oledEnabled:
+            for i, pin in enumerate(button_pins):
+                current_state = disp.RPI.digital_read(pin)
                 
-            # Button release detected (transition from 0 to 1)
-            elif current_state == 1 and last_button_states[pin] == 0:
-                last_button_states[pin] = 1
-                
-                # Check debounce
-                if current_time - last_press_time[pin] > debounce_time:
-                    last_press_time[pin] = current_time
+                # Button press detected (transition from 1 to 0)
+                if current_state == 0 and last_button_states[pin] == 1:
+                    last_button_states[pin] = 0
                     
-                    # Handle button actions
-                    if i == 0:  # Mode button
-                        print("Changing MODE")
-                        switch()
-                        updateDisplay(disp)
-                    elif i == 1:  # Advanced menu button
-                        print("ADVANCED MENU")
-                        updateDisplay_Advanced(disp)
-                        updateDisplay(disp)
-                    elif i == 2:  # OK button
-                        print("OK")
-                        changeISO_OLED(disp)
-                        updateDisplay(disp)
-            
-            # Update button state
-            last_button_states[pin] = current_state
+                # Button release detected (transition from 0 to 1)
+                elif current_state == 1 and last_button_states[pin] == 0:
+                    last_button_states[pin] = 1
+                    
+                    # Check debounce
+                    if current_time - last_press_time[pin] > debounce_time:
+                        last_press_time[pin] = current_time
+                        
+                        # Handle button actions
+                        if i == 0:  # Mode button
+                            logger.info("Changing MODE (OLED button)")
+                            switch()
+                            updateDisplay(disp)
+                            if st7789Enabled and st_disp:
+                                updateST7789Display(st_disp)
+                        elif i == 1:  # Advanced menu button
+                            logger.info("ADVANCED MENU (OLED button)")
+                            updateDisplay_Advanced(disp)
+                            updateDisplay(disp)
+                            if st7789Enabled and st_disp:
+                                updateST7789Display_Advanced(st_disp)
+                                updateST7789Display(st_disp)
+                        elif i == 2:  # OK button
+                            logger.info("OK (OLED button)")
+                            changeISO_OLED(disp)
+                            updateDisplay(disp)
+                            if st7789Enabled and st_disp:
+                                updateST7789Display(st_disp)
+                
+                # Update button state
+                last_button_states[pin] = current_state
+        
+        # Check Pirate Audio buttons if enabled
+        if st7789Enabled:
+            for i, pin in enumerate(st_button_pins):
+                current_state = GPIO.input(pin)  # 1 = released, 0 = pressed
+                
+                # Button press detected (transition from 1 to 0)
+                if current_state == 0 and last_button_states[pin] == 1:
+                    last_button_states[pin] = 0
+                    
+                # Button release detected (transition from 0 to 1)
+                elif current_state == 1 and last_button_states[pin] == 0:
+                    last_button_states[pin] = 1
+                    
+                    # Check debounce
+                    if current_time - last_press_time[pin] > debounce_time:
+                        last_press_time[pin] = current_time
+                        
+                        # Handle button actions
+                        if i == 0:  # Mode button (GPIO 16)
+                            logger.info("Changing MODE (Pirate button)")
+                            switch()
+                            if oledEnabled:
+                                updateDisplay(disp)
+                            if st_disp:
+                                updateST7789Display(st_disp)
+                        elif i == 1:  # Advanced menu button (GPIO 24)
+                            logger.info("ADVANCED MENU (Pirate button)")
+                            if st_disp:
+                                updateST7789Display_Advanced(st_disp)
+                                time.sleep(0.5)  # Give user time to see the screen
+                                # Wait for button press/release
+                                while True:
+                                    if GPIO.input(16) == 0:  # Confirm
+                                        requests.request('GET', 'http://127.0.0.1/shutdown')
+                                        break
+                                    if GPIO.input(24) == 0:  # Cancel
+                                        break
+                                    time.sleep(0.1)
+                                updateST7789Display(st_disp)
+                            if oledEnabled:
+                                updateDisplay_Advanced(disp)
+                                updateDisplay(disp)
+                        elif i == 2 or i == 3:  # Up/Down buttons (GPIO 5/6)
+                            logger.info("ISO selection (Pirate button)")
+                            if st_disp:
+                                changeST7789ISO(st_disp)
+                            if oledEnabled:
+                                changeISO_OLED(disp)
+                                updateDisplay(disp)
+                
+                # Update button state
+                last_button_states[pin] = current_state
         
         # Handle display updates separately from button presses
         should_update = False
@@ -667,7 +795,10 @@ def getOLEDinput():
             should_update = True
         
         if should_update:
-            updateDisplay(disp)
+            if oledEnabled:
+                updateDisplay(disp)
+            if st7789Enabled and st_disp:
+                updateST7789Display(st_disp)
             
         # More efficient sleep that doesn't block too long
         time.sleep(0.05)
@@ -678,6 +809,237 @@ def stopPiOled():
     exitRequested = 1
     print("Stopping OLED")
     disp.RPI.module_exit()
+
+def init_st7789():
+    """Initialize the ST7789 display used in Pirate Audio boards"""
+    try:
+        import RPi.GPIO as GPIO
+        # Set GPIO mode explicitly before any GPIO operations
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setwarnings(False)  # Disable warnings
+        
+        # Initialize display with Pirate Audio specific configuration
+        # Using values from the reference implementation
+        logger.info("Creating ST7789 object with Pirate Audio parameters")
+        display = st7789.ST7789(
+            port=0,                  # SPI port 0
+            cs=1,                    # SPI CS pin 1 (BG_SPI_CS_FRONT)
+            dc=9,                    # GPIO pin 9 for data/command - DIFFERENT from your current value!
+            backlight=13,            # Use backlight pin directly in constructor
+            width=240,               # Display width
+            height=240,              # Display height
+            rotation=90,             # Pirate Audio uses 90 degree rotation
+            spi_speed_hz=80000000,   # 80MHz - same as reference
+            offset_left=0,
+            offset_top=0
+        )
+        
+        # Initialize display
+        logger.info("Beginning display initialization sequence")
+        display.begin()
+        time.sleep(0.1)  # Brief pause after initialization
+        
+        # Test the display with a sequence of colors
+        logger.info("Testing display with color sequence")
+        
+        # Create a solid red image
+        red_image = Image.new('RGB', (display.width, display.height), color=(255, 0, 0))
+        display.display(red_image)
+        logger.info("Displayed red test pattern")
+        time.sleep(0.5)
+        
+        # Create a solid green image
+        green_image = Image.new('RGB', (display.width, display.height), color=(0, 255, 0))
+        display.display(green_image)
+        logger.info("Displayed green test pattern")
+        time.sleep(0.5)
+        
+        # Create a solid blue image
+        blue_image = Image.new('RGB', (display.width, display.height), color=(0, 0, 255))
+        display.display(blue_image)
+        logger.info("Displayed blue test pattern")
+        time.sleep(0.5)
+        
+        # Create a solid white image
+        white_image = Image.new('RGB', (display.width, display.height), color=(255, 255, 255))
+        display.display(white_image)
+        logger.info("Displayed white test pattern")
+        
+        logger.info("ST7789 display initialization complete")
+        return display
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize ST7789 display: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return None
+
+# Add these new functions to provide a consistent interface
+
+def updateST7789Display(display):
+    """Update the ST7789 display with current status information"""
+    image = Image.new('RGB', (display.width, display.height), color=(255, 255, 255))
+    draw = ImageDraw.Draw(image)
+    
+    # Draw header
+    draw.rectangle([(0, 0), (240, 30)], fill=(58, 124, 165))
+    draw.text((10, 5), "USBODE v:" + versionNum, font=st_fontL, fill=(255, 255, 255))
+    
+    # Draw content
+    draw.text((10, 40), "IP: " + myIPAddress, font=st_fontL, fill=(0, 0, 0))
+    
+    iso_name = str.replace(getMountedCDName(), store_mnt+'/', '')
+    # Truncate if too long
+    if len(iso_name) > 20:
+        iso_name = iso_name[:17] + "..."
+    draw.text((10, 70), "ISO: " + iso_name, font=st_fontL, fill=(0, 0, 0))
+    
+    mode = checkState()
+    mode_text = "(CD-Emulator)" if mode == 1 else "(ExFAT mode)" if mode == 2 else ""
+    draw.text((10, 100), f"Mode: {mode} {mode_text}", font=st_fontL, fill=(0, 0, 0))
+    
+    # Draw button labels at bottom
+    draw.rectangle([(0, 190), (240, 240)], fill=(58, 124, 165))
+    draw.text((20, 200), "Change Mode", font=st_fontS, fill=(255, 255, 255))
+    draw.text((160, 200), "Select ISO", font=st_fontS, fill=(255, 255, 255))
+    
+    display.display(image)
+
+def updateST7789Display_FileS(display, iterator, file_list):
+    """Show file selection screen on ST7789 display"""
+    image = Image.new('RGB', (display.width, display.height), color=(255, 255, 255))
+    draw = ImageDraw.Draw(image)
+    
+    # Draw header
+    draw.rectangle([(0, 0), (240, 30)], fill=(58, 124, 165))
+    draw.text((10, 5), "Select ISO", font=st_fontL, fill=(255, 255, 255))
+    
+    # Current ISO
+    current_iso = str.replace(getMountedCDName(), store_mnt+'/', '')
+    if len(current_iso) > 20:
+        current_iso = current_iso[:17] + "..."
+    draw.text((10, 40), "Current: " + current_iso, font=st_fontS, fill=(0, 0, 0))
+    
+    # Draw selection
+    draw.rectangle([(0, 70), (240, 110)], fill=(187, 222, 251))
+    selected_file = file_list[iterator]
+    if len(selected_file) > 25:
+        selected_file = selected_file[:22] + "..."
+    draw.text((10, 80), selected_file, font=st_fontL, fill=(0, 0, 0))
+    
+    # Show navigation help
+    draw.rectangle([(0, 190), (240, 240)], fill=(58, 124, 165))
+    draw.text((20, 200), "Up/Down", font=st_fontS, fill=(255, 255, 255))
+    draw.text((160, 200), "Select", font=st_fontS, fill=(255, 255, 255))
+    
+    display.display(image)
+
+def updateST7789Display_Advanced(display):
+    """Show advanced menu on ST7789 display"""
+    image = Image.new('RGB', (display.width, display.height), color=(255, 255, 255))
+    draw = ImageDraw.Draw(image)
+    
+    # Draw header
+    draw.rectangle([(0, 0), (240, 30)], fill=(58, 124, 165))
+    draw.text((10, 5), "Advanced Menu", font=st_fontL, fill=(255, 255, 255))
+    
+    # Menu options
+    draw.text((20, 80), "Shutdown USBODE", font=st_fontL, fill=(0, 0, 0))
+    
+    # Draw button labels
+    draw.rectangle([(0, 190), (240, 240)], fill=(58, 124, 165))
+    draw.text((20, 200), "Cancel", font=st_fontS, fill=(255, 255, 255))
+    draw.text((160, 200), "Confirm", font=st_fontS, fill=(255, 255, 255))
+    
+    display.display(image)
+
+# Add this function for ST7789 ISO selection
+
+def changeST7789ISO(display):
+    """Handle ISO selection on ST7789 display"""
+    import RPi.GPIO as GPIO
+    # Ensure GPIO mode is set
+    if not hasattr(GPIO, "gpio_function"):  # Check if mode is set
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setwarnings(False)
+    
+    file_list = list_images()
+    iterator = 0
+    
+    if len(file_list) < 1:
+        logger.warning("No images found in store")
+        image = Image.new('RGB', (display.width, display.height), color=(255, 255, 255))
+        draw = ImageDraw.Draw(image)
+        
+        # Draw error header
+        draw.rectangle([(0, 0), (240, 30)], fill=(220, 53, 69))
+        draw.text((10, 5), "Error", font=st_fontL, fill=(255, 255, 255))
+        
+        # Error message
+        draw.text((10, 60), "No ISO images found", font=st_fontL, fill=(0, 0, 0))
+        draw.text((10, 90), "Please add images to", font=st_fontL, fill=(0, 0, 0))
+        draw.text((10, 120), "the storage device", font=st_fontL, fill=(0, 0, 0))
+        
+        display.display(image)
+        time.sleep(2.0)  # Show error for 2 seconds
+        return False
+    
+    # Update display with first file
+    updateST7789Display_FileS(display, iterator, file_list)
+    
+    # Button pins: 5 = Up, 6 = Down, 16 = Select, 24 = Cancel
+    select_button = 16
+    cancel_button = 24
+    up_button = 5
+    down_button = 6
+    
+    # Track button states
+    last_states = {
+        up_button: 1,
+        down_button: 1,
+        select_button: 1,
+        cancel_button: 1
+    }
+    
+    while True:
+        time.sleep(0.05)
+        
+        # Check Up button
+        current_up = GPIO.input(up_button)
+        if current_up == 0 and last_states[up_button] == 1:  # Pressed
+            last_states[up_button] = 0
+        elif current_up == 1 and last_states[up_button] == 0:  # Released
+            iterator = (iterator - 1) % len(file_list)
+            updateST7789Display_FileS(display, iterator, file_list)
+            logger.info(f"Up button: selected {file_list[iterator]}")
+            last_states[up_button] = 1
+        
+        # Check Down button
+        current_down = GPIO.input(down_button)
+        if current_down == 0 and last_states[down_button] == 1:  # Pressed
+            last_states[down_button] = 0
+        elif current_down == 1 and last_states[down_button] == 0:  # Released
+            iterator = (iterator + 1) % len(file_list)
+            updateST7789Display_FileS(display, iterator, file_list)
+            logger.info(f"Down button: selected {file_list[iterator]}")
+            last_states[down_button] = 1
+        
+        # Check Select button
+        current_select = GPIO.input(select_button)
+        if current_select == 0 and last_states[select_button] == 1:  # Pressed
+            last_states[select_button] = 0
+        elif current_select == 1 and last_states[select_button] == 0:  # Released
+            logger.info(f"Loading {store_mnt}/{file_list[iterator]}")
+            requests.request('GET', f'http://127.0.0.1/mount/{urllib.parse.quote_plus(file_list[iterator])}')
+            return True
+        
+        # Check Cancel button
+        current_cancel = GPIO.input(cancel_button)
+        if current_cancel == 0 and last_states[cancel_button] == 1:  # Pressed
+            last_states[cancel_button] = 0
+        elif current_cancel == 1 and last_states[cancel_button] == 0:  # Released
+            logger.info("Cancel button pressed")
+            return False
 
 def main():
     #Setup Environment
@@ -720,17 +1082,17 @@ def main():
         # except Exception as e:
         #     logger.error(f"Failed to start LED blinker: {e}")
 
-        global oledEnabled
-        if oledEnabled:
-            global disp
-            disp = SH1106.SH1106()
-            oledDaemon = Thread(target=getOLEDinput, daemon=True, name='OLED')
+        # Start display thread if any display is enabled
+        if st7789Enabled or oledEnabled:
+            displayDaemon = Thread(target=getDisplayInput, daemon=True, name='Display')
             try:
-                oledDaemon.start()
-                logger.info("Waveshare OLED thread started")
-
+                displayDaemon.start()
+                if st7789Enabled:
+                    logger.info("ST7789 display thread started")
+                elif oledEnabled:
+                    logger.info("Waveshare OLED thread started")
             except Exception as e:
-                logger.error(f"Failed to start Waveshare OLED thread: {e}")
+                logger.error(f"Failed to start display thread: {e}")
             
         while exitRequested == 0:
             time.sleep(0.15)
