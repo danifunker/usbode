@@ -7,7 +7,7 @@ echo 0x0200 > bcdUSB      # USB 2.0
 
 echo "1111111111" > strings/0x409/serialnumber
 echo "Linux" > strings/0x409/manufacturer
-echo "USBODE-v1.9-ExFAT" > strings/0x409/product
+echo "USBODE-v1.99-ExFAT" > strings/0x409/product
 
 echo "Config 1: USBODE-USB" > configs/c.1/strings/0x409/configuration
 echo 0 > configs/c.1/MaxPower

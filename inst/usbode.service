@@ -1,5 +1,7 @@
 [Unit]
 Description=USBODE
+DefaultDependencies=yes
+After=network-pre.target
 
 [Service]
 Type=simple
@@ -10,4 +12,4 @@ StandardError=journal+console
 ExecStop=/usr/bin/curl /usr/bin/curl http://127.0.0.1/exit
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=local-fs.target
