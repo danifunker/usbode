@@ -457,18 +457,41 @@ def start_exit():
     global disp, st_disp, exitRequested, oledEnabled, st7789Enabled
     exitRequested = 1
     
-    if st7789Enabled:
+    # Show shutdown message and then clear the ST7789 display
+    if st7789Enabled and st_disp:
         try:
+            # First show a shutdown message
+            image = Image.new('RGB', (st_disp.width, st_disp.height), color=(0, 0, 0))
+            draw = ImageDraw.Draw(image)
+            draw.text((40, 100), "Shutting down...", font=st_fontL, fill=(255, 255, 255))
+            st_disp.display(image)
+            time.sleep(1)
+            
+            # Then clear to black
+            black_image = Image.new('RGB', (st_disp.width, st_disp.height), color=(0, 0, 0))
+            st_disp.display(black_image)
+            
+            # Clean up GPIO
             import RPi.GPIO as GPIO
             GPIO.cleanup()
-            logger.info("ST7789 GPIO cleaned up")
+            logger.info("ST7789 display cleared and GPIO cleaned up")
         except Exception as e:
-            logger.error(f"Error cleaning up GPIO: {e}")
+            logger.error(f"Error shutting down ST7789 display: {e}")
             
-    elif oledEnabled:
+    # Clean up the OLED display if it was active
+    elif oledEnabled and disp:
         try:
+            # First show a shutdown message
+            image1 = Image.new('1', (disp.width, disp.height), "BLACK")
+            draw = ImageDraw.Draw(image1)
+            draw.text((10, 25), "Shutting down...", font=fontL, fill=1)
+            disp.ShowImage(disp.getbuffer(image1))
+            time.sleep(1)
+            
+            # Then clear to black
+            disp.clear()
             disp.RPI.module_exit()
-            logger.info("OLED display stopped")
+            logger.info("OLED display cleared and stopped")
         except Exception as e:
             logger.error(f"Error stopping OLED: {e}")
             
@@ -635,14 +658,19 @@ def getDisplayInput():
         # GPIO mode is already set at import time, no need to set again
         st_disp = init_st7789()
         
-        # Pirate Audio buttons (GPIO numbers)
-        # 5 = Up, 6 = Down, 16 = Mode (KEY1), 24 = Advanced (KEY2)
         import RPi.GPIO as GPIO
         
-        # Pirate Audio buttons
-        st_button_pins = [16, 24, 5, 6]  # Mode, Advanced, Up, Down
+        # Pirate Audio button GPIO pins:
+        # Button A: GPIO 5 (up)
+        # Button B: GPIO 6 (down)
+        # Button X: GPIO 16 (select/ok)
+        # Button Y: GPIO 24 (back/mode)
+        st_button_pins = [5, 6, 16, 24]  # Up, Down, Select, Mode
+        button_names = ["A (Up)", "B (Down)", "X (Select)", "Y (Mode)"]
+        
         for pin in st_button_pins:
             GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+            logger.info(f"Setup Pirate Audio button on GPIO {pin}")
         
         # Initial display update for ST7789
         if st_disp:
@@ -685,8 +713,14 @@ def getDisplayInput():
     last_update_time = time.time()
     update_interval = 5  # Check for updates every 5 seconds
     
+    # Screen timeout variables
+    screen_timeout = 15  # seconds
+    last_activity_time = time.time()
+    screen_is_on = True
+    
     while not exitRequested:
         current_time = time.time()
+        button_activity = False  # Track if any button was pressed this cycle
         
         # Check waveshare OLED buttons if enabled
         if oledEnabled:
@@ -696,35 +730,44 @@ def getDisplayInput():
                 # Button press detected (transition from 1 to 0)
                 if current_state == 0 and last_button_states[pin] == 1:
                     last_button_states[pin] = 0
+                    button_activity = True
                     
                 # Button release detected (transition from 0 to 1)
                 elif current_state == 1 and last_button_states[pin] == 0:
                     last_button_states[pin] = 1
+                    button_activity = True
                     
                     # Check debounce
                     if current_time - last_press_time[pin] > debounce_time:
                         last_press_time[pin] = current_time
                         
-                        # Handle button actions
-                        if i == 0:  # Mode button
-                            logger.info("Changing MODE (OLED button)")
-                            switch()
+                        # If screen is off, just turn it on and do nothing else
+                        if not screen_is_on:
+                            screen_is_on = True
                             updateDisplay(disp)
                             if st7789Enabled and st_disp:
                                 updateST7789Display(st_disp)
-                        elif i == 1:  # Advanced menu button
-                            logger.info("ADVANCED MENU (OLED button)")
-                            updateDisplay_Advanced(disp)
-                            updateDisplay(disp)
-                            if st7789Enabled and st_disp:
-                                updateST7789Display_Advanced(st_disp)
-                                updateST7789Display(st_disp)
-                        elif i == 2:  # OK button
-                            logger.info("OK (OLED button)")
-                            changeISO_OLED(disp)
-                            updateDisplay(disp)
-                            if st7789Enabled and st_disp:
-                                updateST7789Display(st_disp)
+                        else:
+                            # Handle button actions
+                            if i == 0:  # Mode button
+                                logger.info("Changing MODE (OLED button)")
+                                switch()
+                                updateDisplay(disp)
+                                if st7789Enabled and st_disp:
+                                    updateST7789Display(st_disp)
+                            elif i == 1:  # Advanced menu button
+                                logger.info("ADVANCED MENU (OLED button)")
+                                updateDisplay_Advanced(disp)
+                                updateDisplay(disp)
+                                if st7789Enabled and st_disp:
+                                    updateST7789Display_Advanced(st_disp)
+                                    updateST7789Display(st_disp)
+                            elif i == 2:  # OK button
+                                logger.info("OK (OLED button)")
+                                changeISO_OLED(disp)
+                                updateDisplay(disp)
+                                if st7789Enabled and st_disp:
+                                    updateST7789Display(st_disp)
                 
                 # Update button state
                 last_button_states[pin] = current_state
@@ -737,50 +780,77 @@ def getDisplayInput():
                 # Button press detected (transition from 1 to 0)
                 if current_state == 0 and last_button_states[pin] == 1:
                     last_button_states[pin] = 0
+                    button_activity = True
                     
                 # Button release detected (transition from 0 to 1)
                 elif current_state == 1 and last_button_states[pin] == 0:
                     last_button_states[pin] = 1
+                    button_activity = True
                     
                     # Check debounce
                     if current_time - last_press_time[pin] > debounce_time:
                         last_press_time[pin] = current_time
                         
-                        # Handle button actions
-                        if i == 0:  # Mode button (GPIO 16)
-                            logger.info("Changing MODE (Pirate button)")
-                            switch()
-                            if oledEnabled:
-                                updateDisplay(disp)
+                        # If screen is off, just turn it on and do nothing else
+                        if not screen_is_on:
+                            screen_is_on = True
                             if st_disp:
                                 updateST7789Display(st_disp)
-                        elif i == 1:  # Advanced menu button (GPIO 24)
-                            logger.info("ADVANCED MENU (Pirate button)")
-                            if st_disp:
-                                updateST7789Display_Advanced(st_disp)
-                                time.sleep(0.5)  # Give user time to see the screen
-                                # Wait for button press/release
-                                while True:
-                                    if GPIO.input(16) == 0:  # Confirm
-                                        requests.request('GET', 'http://127.0.0.1/shutdown')
-                                        break
-                                    if GPIO.input(24) == 0:  # Cancel
-                                        break
-                                    time.sleep(0.1)
-                                updateST7789Display(st_disp)
                             if oledEnabled:
-                                updateDisplay_Advanced(disp)
                                 updateDisplay(disp)
-                        elif i == 2 or i == 3:  # Up/Down buttons (GPIO 5/6)
-                            logger.info("ISO selection (Pirate button)")
-                            if st_disp:
-                                changeST7789ISO(st_disp)
-                            if oledEnabled:
-                                changeISO_OLED(disp)
-                                updateDisplay(disp)
+                        else:
+                            # Handle button actions based on correct button mapping
+                            if i == 0 or i == 1:  # Button A (5) or B (6) - Up/Down
+                                logger.info(f"ISO selection with {button_names[i]} button")
+                                if st_disp:
+                                    changeST7789ISO(st_disp)
+                                if oledEnabled:
+                                    changeISO_OLED(disp)
+                                    updateDisplay(disp)
+                            elif i == 2:  # Button X (16) - Advanced Menu
+                                logger.info(f"Opening Advanced Menu with {button_names[i]} button")
+                                if st_disp:
+                                    handleST7789AdvancedMenu(st_disp)
+                                    updateST7789Display(st_disp)
+                            elif i == 3:  # Button Y (24) - ISO Selection (was Mode)
+                                logger.info(f"Opening ISO selection with {button_names[i]} button")
+                                if st_disp:
+                                    changeST7789ISO(st_disp)
+                                    updateST7789Display(st_disp)
                 
                 # Update button state
                 last_button_states[pin] = current_state
+        
+        # Update last activity time if any button was pressed
+        if button_activity:
+            last_activity_time = current_time
+        
+        # Handle screen timeout
+        if screen_is_on and (current_time - last_activity_time > screen_timeout):
+            logger.info("Screen timeout reached, turning off display")
+            screen_is_on = False
+            
+            # Turn off ST7789 display backlight
+            if st7789Enabled and st_disp:
+                try:
+                    # Black image to clear the screen
+                    black_image = Image.new('RGB', (st_disp.width, st_disp.height), color=(0, 0, 0))
+                    st_disp.display(black_image)
+                    
+                    # Turn off backlight by setting GPIO 13 low
+                    import RPi.GPIO as GPIO
+                    GPIO.output(13, GPIO.LOW)
+                    logger.info("ST7789 display backlight turned off")
+                except Exception as e:
+                    logger.error(f"Error turning off ST7789 display: {e}")
+            
+            # Turn off OLED display
+            if oledEnabled and disp:
+                try:
+                    disp.clear()
+                    logger.info("OLED display cleared")
+                except Exception as e:
+                    logger.error(f"Error clearing OLED display: {e}")
         
         # Handle display updates separately from button presses
         should_update = False
@@ -794,14 +864,39 @@ def getDisplayInput():
             last_update_time = current_time
             should_update = True
         
-        if should_update:
+        # Only update the display if screen is on and an update is needed
+        if screen_is_on and should_update:
             if oledEnabled:
                 updateDisplay(disp)
             if st7789Enabled and st_disp:
                 updateST7789Display(st_disp)
+                
+            # Reset activity timer when we update the screen
+            last_activity_time = current_time
             
         # More efficient sleep that doesn't block too long
         time.sleep(0.05)
+
+def wake_screen():
+    """Turn on the screen if it's off due to timeout"""
+    global st_disp, disp, oledEnabled, st7789Enabled
+    
+    if st7789Enabled and st_disp:
+        try:
+            # Turn on backlight by setting GPIO 13 high
+            import RPi.GPIO as GPIO
+            GPIO.output(13, GPIO.HIGH)
+            updateST7789Display(st_disp)
+            logger.info("ST7789 display backlight turned on")
+        except Exception as e:
+            logger.error(f"Error turning on ST7789 display: {e}")
+    
+    if oledEnabled and disp:
+        try:
+            updateDisplay(disp)
+            logger.info("OLED display turned on")
+        except Exception as e:
+            logger.error(f"Error turning on OLED display: {e}")
 
 def stopPiOled():
     global disp
@@ -885,23 +980,167 @@ def updateST7789Display(display):
     draw.rectangle([(0, 0), (240, 30)], fill=(58, 124, 165))
     draw.text((10, 5), "USBODE v:" + versionNum, font=st_fontL, fill=(255, 255, 255))
     
-    # Draw content
-    draw.text((10, 40), "IP: " + myIPAddress, font=st_fontL, fill=(0, 0, 0))
+    # Draw WiFi icon instead of "IP:" text
+    wifi_x, wifi_y = 10, 40
+    # Draw WiFi icon - concentric arcs to represent signal
+    # Outer arc
+    draw.arc([(wifi_x, wifi_y), (wifi_x + 20, wifi_y + 20)], 
+              225, 315, fill=(0, 0, 0), width=2)
+    # Middle arc
+    draw.arc([(wifi_x + 5, wifi_y + 5), (wifi_x + 15, wifi_y + 15)], 
+              225, 315, fill=(0, 0, 0), width=2)
+    # Center dot
+    draw.ellipse([(wifi_x + 9, wifi_y + 9), (wifi_x + 11, wifi_y + 11)], 
+                 fill=(0, 0, 0))
     
+    # Draw IP address after WiFi icon
+    draw.text((35, 40), myIPAddress, font=st_fontL, fill=(0, 0, 0))
+    
+    # Draw CD icon (simple circle with hole and shine)
+    cd_x, cd_y = 10, 70
+    cd_radius = 10
+    # Outer circle (silver)
+    draw.ellipse([(cd_x, cd_y), (cd_x + 2*cd_radius, cd_y + 2*cd_radius)], 
+                 fill=(192, 192, 192), outline=(100, 100, 100))
+    # Inner circle (hole)
+    draw.ellipse([(cd_x + cd_radius - 3, cd_y + cd_radius - 3), 
+                  (cd_x + cd_radius + 3, cd_y + cd_radius + 3)], 
+                 fill=(255, 255, 255), outline=(100, 100, 100))
+    # Shine highlight
+    draw.arc([(cd_x + 2, cd_y + 2), (cd_x + 2*cd_radius - 4, cd_y + 2*cd_radius - 4)], 
+              45, 180, fill=(255, 255, 255), width=2)
+    
+    # Get ISO name and allow it to wrap over multiple lines
     iso_name = str.replace(getMountedCDName(), store_mnt+'/', '')
-    # Truncate if too long
-    if len(iso_name) > 20:
-        iso_name = iso_name[:17] + "..."
-    draw.text((10, 70), "ISO: " + iso_name, font=st_fontL, fill=(0, 0, 0))
     
+    # Use shorter line length (19 chars) for better readability with the CD icon
+    chars_per_line = 19
+    
+    # Display ISO name with special handling for very long filenames
+    if len(iso_name) > 0:
+        # First line with CD icon offset
+        line1 = iso_name[:chars_per_line]
+        draw.text((35, 70), line1, font=st_fontL, fill=(0, 0, 0))
+        
+        if len(iso_name) > chars_per_line:
+            # Second line
+            line2 = iso_name[chars_per_line:chars_per_line*2]
+            draw.text((10, 90), line2, font=st_fontL, fill=(0, 0, 0))
+            
+            if len(iso_name) > chars_per_line*2:
+                # Special handling for long filenames
+                if len(iso_name) > chars_per_line*3:
+                    # If we can't show the full name in 3 lines, show start, middle ellipsis, and end
+                    # Show the last 11 characters as requested
+                    last_part = iso_name[-11:] if len(iso_name) >= 11 else iso_name
+                    # Show ellipsis in the middle
+                    line3 = iso_name[chars_per_line*2:chars_per_line*3-14] + "..." + last_part
+                    draw.text((10, 110), line3, font=st_fontL, fill=(0, 0, 0))
+                else:
+                    # If it fits in exactly 3 lines, just show the third line
+                    line3 = iso_name[chars_per_line*2:]
+                    draw.text((10, 110), line3, font=st_fontL, fill=(0, 0, 0))
+    
+    # Draw mode indicator line with only the state number and icons (no "Mode:" text)
     mode = checkState()
-    mode_text = "(CD-Emulator)" if mode == 1 else "(ExFAT mode)" if mode == 2 else ""
-    draw.text((10, 100), f"Mode: {mode} {mode_text}", font=st_fontL, fill=(0, 0, 0))
     
-    # Draw button labels at bottom
+    # Draw USB icon
+    usb_x = 10
+    usb_y = 155
+    
+    # USB connector body
+    draw.rectangle([(usb_x, usb_y + 2), (usb_x + 10, usb_y + 14)], 
+                 fill=(50, 50, 50), outline=(0, 0, 0))
+    # USB prongs
+    draw.rectangle([(usb_x + 3, usb_y), (usb_x + 7, usb_y + 3)], 
+                 fill=(200, 200, 200), outline=(0, 0, 0))
+    # USB symbol
+    draw.ellipse([(usb_x + 3, usb_y + 4), (usb_x + 7, usb_y + 8)], 
+                outline=(255, 255, 255))
+    draw.line([(usb_x + 5, usb_y + 8), (usb_x + 5, usb_y + 12)], 
+             fill=(255, 255, 255))
+    draw.line([(usb_x + 3, usb_y + 10), (usb_x + 7, usb_y + 10)], 
+             fill=(255, 255, 255))
+    
+    # Draw mode number
+    draw.text((30, 155), f"{mode}", font=st_fontL, fill=(0, 0, 0))
+    
+    # Position for mode icon
+    mode_icon_x = 50
+    mode_icon_y = 155
+    
+    if mode == 1:  # CD-Emulator mode - draw CD icon
+        # Draw CD icon
+        cd_radius = 8
+        # Outer circle (silver)
+        draw.ellipse([(mode_icon_x, mode_icon_y), (mode_icon_x + 2*cd_radius, mode_icon_y + 2*cd_radius)], 
+                    fill=(192, 192, 192), outline=(100, 100, 100))
+        # Inner circle (hole)
+        draw.ellipse([(mode_icon_x + cd_radius - 2, mode_icon_y + cd_radius - 2), 
+                    (mode_icon_x + cd_radius + 2, mode_icon_y + cd_radius + 2)], 
+                    fill=(255, 255, 255), outline=(100, 100, 100))
+        # Shine highlight
+        draw.arc([(mode_icon_x + 2, mode_icon_y + 2), (mode_icon_x + 2*cd_radius - 4, mode_icon_y + 2*cd_radius - 4)], 
+                45, 180, fill=(255, 255, 255), width=1)
+                
+    elif mode == 2:  # ExFAT mode - draw hard disk icon
+        # Draw hard disk icon
+        disk_width = 18
+        disk_height = 14
+        # Main disk body
+        draw.rectangle([(mode_icon_x, mode_icon_y + 2), 
+                      (mode_icon_x + disk_width, mode_icon_y + disk_height)], 
+                     fill=(100, 100, 100), outline=(50, 50, 50))
+        # Disk connector part
+        draw.rectangle([(mode_icon_x + disk_width - 5, mode_icon_y), 
+                      (mode_icon_x + disk_width, mode_icon_y + 4)], 
+                     fill=(180, 180, 180), outline=(50, 50, 50))
+        # Disk details
+        draw.line([(mode_icon_x + 3, mode_icon_y + 5), 
+                  (mode_icon_x + disk_width - 3, mode_icon_y + 5)], 
+                 fill=(200, 200, 200))
+        draw.line([(mode_icon_x + 3, mode_icon_y + 8), 
+                  (mode_icon_x + disk_width - 3, mode_icon_y + 8)], 
+                 fill=(200, 200, 200))
+        draw.line([(mode_icon_x + 3, mode_icon_y + 11), 
+                  (mode_icon_x + disk_width - 8, mode_icon_y + 11)], 
+                 fill=(200, 200, 200))
+    
+    # Draw button labels at bottom with icons instead of text - larger buttons
     draw.rectangle([(0, 190), (240, 240)], fill=(58, 124, 165))
-    draw.text((20, 200), "Change Mode", font=st_fontS, fill=(255, 255, 255))
-    draw.text((160, 200), "Select ISO", font=st_fontS, fill=(255, 255, 255))
+    
+    # A button - Up arrow (larger)
+    draw.text((12, 200), "A", font=st_fontS, fill=(255, 255, 255))
+    # Draw up arrow
+    arrow_x, arrow_y = 30, 205
+    draw.line([(arrow_x, arrow_y+12), (arrow_x, arrow_y-8)], fill=(0, 0, 0), width=3)
+    draw.line([(arrow_x-8, arrow_y), (arrow_x, arrow_y-8), (arrow_x+8, arrow_y)], fill=(0, 0, 0), width=3)
+    
+    # B button - Down arrow (larger)
+    draw.text((72, 200), "B", font=st_fontS, fill=(255, 255, 255))
+    # Draw down arrow
+    arrow_x, arrow_y = 90, 205
+    draw.line([(arrow_x, arrow_y-8), (arrow_x, arrow_y+12)], fill=(0, 0, 0), width=3)
+    draw.line([(arrow_x-8, arrow_y), (arrow_x, arrow_y+12), (arrow_x+8, arrow_y)], fill=(0, 0, 0), width=3)
+    
+    # X button - Advanced menu (three horizontal lines, larger)
+    draw.text((132, 200), "X", font=st_fontS, fill=(255, 255, 255))
+    # Draw three lines
+    menu_x, menu_y = 150, 200
+    draw.line([(menu_x, menu_y+1), (menu_x+20, menu_y+1)], fill=(0, 0, 0), width=3)
+    draw.line([(menu_x, menu_y+8), (menu_x+20, menu_y+8)], fill=(0, 0, 0), width=3)
+    draw.line([(menu_x, menu_y+15), (menu_x+20, menu_y+15)], fill=(0, 0, 0), width=3)
+    
+    # Y button - ISO selection (folder icon instead of CD)
+    draw.text((192, 200), "Y", font=st_fontS, fill=(255, 255, 255))
+    # Draw folder icon
+    folder_x, folder_y = 210, 198
+    # Folder base
+    draw.rectangle([(folder_x, folder_y+5), (folder_x+20, folder_y+20)], 
+                  outline=(0, 0, 0), fill=(255, 223, 128), width=2)
+    # Folder tab
+    draw.rectangle([(folder_x+2, folder_y), (folder_x+10, folder_y+5)], 
+                  outline=(0, 0, 0), fill=(255, 223, 128), width=2)
     
     display.display(image)
 
@@ -914,28 +1153,99 @@ def updateST7789Display_FileS(display, iterator, file_list):
     draw.rectangle([(0, 0), (240, 30)], fill=(58, 124, 165))
     draw.text((10, 5), "Select ISO", font=st_fontL, fill=(255, 255, 255))
     
-    # Current ISO
+    # Replace "Current:" text with CD icon
+    cd_x, cd_y = 10, 40
+    cd_radius = 8
+    # Outer circle (silver)
+    draw.ellipse([(cd_x, cd_y), (cd_x + 2*cd_radius, cd_y + 2*cd_radius)], 
+                fill=(192, 192, 192), outline=(100, 100, 100))
+    # Inner circle (hole)
+    draw.ellipse([(cd_x + cd_radius - 2, cd_y + cd_radius - 2), 
+                (cd_x + cd_radius + 2, cd_y + cd_radius + 2)], 
+                fill=(255, 255, 255), outline=(100, 100, 100))
+    # Shine highlight
+    draw.arc([(cd_x + 2, cd_y + 2), (cd_x + 2*cd_radius - 4, cd_y + 2*cd_radius - 4)], 
+            45, 180, fill=(255, 255, 255), width=1)
+    
+    # Show first 8 and last 8 characters of current ISO name
     current_iso = str.replace(getMountedCDName(), store_mnt+'/', '')
-    if len(current_iso) > 20:
-        current_iso = current_iso[:17] + "..."
-    draw.text((10, 40), "Current: " + current_iso, font=st_fontS, fill=(0, 0, 0))
+    if len(current_iso) > 16:  # If longer than 16 chars, show first 8 + "..." + last 8
+        current_iso_display = current_iso[:8] + "..." + current_iso[-8:]
+    else:
+        current_iso_display = current_iso  # If short enough, show the whole thing
+        
+    draw.text((35, 40), current_iso_display, font=st_fontS, fill=(0, 0, 0))
     
-    # Draw selection
-    draw.rectangle([(0, 70), (240, 110)], fill=(187, 222, 251))
+    # Draw selection with multi-line support for long filenames
+    draw.rectangle([(0, 70), (240, 130)], fill=(187, 222, 251))
     selected_file = file_list[iterator]
-    if len(selected_file) > 25:
-        selected_file = selected_file[:22] + "..."
-    draw.text((10, 80), selected_file, font=st_fontL, fill=(0, 0, 0))
     
-    # Show navigation help
+    # Handle multi-line display of filename with guaranteed ending
+    chars_per_line = 25  # Characters that fit on one line
+    if len(selected_file) <= chars_per_line:
+        # Single line display
+        draw.text((10, 90), selected_file, font=st_fontL, fill=(0, 0, 0))
+    else:
+        # For long filenames, ensure the last 11 characters are always shown
+        if len(selected_file) > chars_per_line*2 - 3:
+            # Very long filename - need to show start, ellipsis, and end
+            last_part = selected_file[-11:] if len(selected_file) >= 11 else selected_file
+            first_part = selected_file[:chars_per_line]
+            middle_part = selected_file[chars_per_line:chars_per_line*2-14]
+            
+            # First line
+            draw.text((10, 80), first_part, font=st_fontL, fill=(0, 0, 0))
+            
+            # Second line with ellipsis and ending
+            second_line = middle_part + "..." + last_part
+            draw.text((10, 105), second_line, font=st_fontL, fill=(0, 0, 0))
+        else:
+            # Fits in two lines without ellipsis
+            line1 = selected_file[:chars_per_line]
+            line2 = selected_file[chars_per_line:]
+            draw.text((10, 80), line1, font=st_fontL, fill=(0, 0, 0))
+            draw.text((10, 105), line2, font=st_fontL, fill=(0, 0, 0))
+    
+    # Position indicator (N of Total)
+    total_files = len(file_list)
+    position_text = f"File {iterator+1} of {total_files}"
+    draw.text((10, 140), position_text, font=st_fontS, fill=(0, 0, 0))
+    
+    # Show navigation help with larger icons to match other screens
     draw.rectangle([(0, 190), (240, 240)], fill=(58, 124, 165))
-    draw.text((20, 200), "Up/Down", font=st_fontS, fill=(255, 255, 255))
-    draw.text((160, 200), "Select", font=st_fontS, fill=(255, 255, 255))
+    
+    # A button - Up arrow (larger)
+    draw.text((12, 200), "A", font=st_fontS, fill=(255, 255, 255))
+    # Draw up arrow
+    arrow_x, arrow_y = 30, 205
+    draw.line([(arrow_x, arrow_y+12), (arrow_x, arrow_y-8)], fill=(0, 0, 0), width=3)
+    draw.line([(arrow_x-8, arrow_y), (arrow_x, arrow_y-8), (arrow_x+8, arrow_y)], fill=(0, 0, 0), width=3)
+    
+    # B button - Down arrow (larger)
+    draw.text((72, 200), "B", font=st_fontS, fill=(255, 255, 255))
+    # Draw down arrow
+    arrow_x, arrow_y = 90, 205
+    draw.line([(arrow_x, arrow_y-8), (arrow_x, arrow_y+12)], fill=(0, 0, 0), width=3)
+    draw.line([(arrow_x-8, arrow_y), (arrow_x, arrow_y+12), (arrow_x+8, arrow_y)], fill=(0, 0, 0), width=3)
+    
+    # Y button - Green checkmark (for OK) - FIXED: switched Y and X positions
+    draw.text((132, 200), "Y", font=st_fontS, fill=(255, 255, 255))
+    # Draw checkmark
+    check_x, check_y = 150, 210
+    draw.line([(check_x-10, check_y), (check_x, check_y+10), (check_x+15, check_y-15)], 
+              fill=(0, 255, 0), width=3)
+    
+    # X button - Red X (for Cancel) - FIXED: switched X and Y positions
+    draw.text((192, 200), "X", font=st_fontS, fill=(255, 255, 255))
+    # Draw X
+    x_x, x_y = 210, 205
+    draw.line([(x_x-10, x_y-10), (x_x+10, x_y+10)], fill=(255, 0, 0), width=3)
+    draw.line([(x_x+10, x_y-10), (x_x-10, x_y+10)], fill=(255, 0, 0), width=3)
     
     display.display(image)
 
-def updateST7789Display_Advanced(display):
-    """Show advanced menu on ST7789 display"""
+def updateST7789Display_Advanced(display, selected_item=0):
+    """Show advanced menu on ST7789 display with item selection"""
     image = Image.new('RGB', (display.width, display.height), color=(255, 255, 255))
     draw = ImageDraw.Draw(image)
     
@@ -943,13 +1253,54 @@ def updateST7789Display_Advanced(display):
     draw.rectangle([(0, 0), (240, 30)], fill=(58, 124, 165))
     draw.text((10, 5), "Advanced Menu", font=st_fontL, fill=(255, 255, 255))
     
-    # Menu options
-    draw.text((20, 80), "Shutdown USBODE", font=st_fontL, fill=(0, 0, 0))
+    # Menu options - Mode switching is first
+    current_mode = checkState()
+    mode_text = "Switch to ExFAT" if current_mode == 1 else "Switch to CD-ROM" if current_mode == 2 else "Enable Device"
     
-    # Draw button labels
+    # First item - Mode switching
+    if selected_item == 0:
+        draw.rectangle([(10, 50), (230, 85)], fill=(187, 222, 251), outline=(58, 124, 165), width=2)
+    else:
+        draw.rectangle([(10, 50), (230, 85)], fill=(255, 255, 255), outline=(200, 200, 200), width=1)
+    draw.text((20, 60), mode_text, font=st_fontL, fill=(0, 0, 0))
+    
+    # Second item - Shutdown option
+    if selected_item == 1:
+        draw.rectangle([(10, 95), (230, 130)], fill=(187, 222, 251), outline=(58, 124, 165), width=2)
+    else:
+        draw.rectangle([(10, 95), (230, 130)], fill=(255, 255, 255), outline=(200, 200, 200), width=1)
+    draw.text((20, 105), "Shutdown USBODE", font=st_fontL, fill=(0, 0, 0))
+    
+    # Draw navigation buttons - larger size to fill ~86% of the bottom bar
     draw.rectangle([(0, 190), (240, 240)], fill=(58, 124, 165))
-    draw.text((20, 200), "Cancel", font=st_fontS, fill=(255, 255, 255))
-    draw.text((160, 200), "Confirm", font=st_fontS, fill=(255, 255, 255))
+    
+    # A button - Up arrow (larger)
+    draw.text((12, 200), "A", font=st_fontS, fill=(255, 255, 255))
+    # Draw up arrow
+    arrow_x, arrow_y = 30, 205
+    draw.line([(arrow_x, arrow_y+12), (arrow_x, arrow_y-8)], fill=(0, 0, 0), width=3)
+    draw.line([(arrow_x-8, arrow_y), (arrow_x, arrow_y-8), (arrow_x+8, arrow_y)], fill=(0, 0, 0), width=3)
+    
+    # B button - Down arrow (larger)
+    draw.text((72, 200), "B", font=st_fontS, fill=(255, 255, 255))
+    # Draw down arrow
+    arrow_x, arrow_y = 90, 205
+    draw.line([(arrow_x, arrow_y-8), (arrow_x, arrow_y+12)], fill=(0, 0, 0), width=3)
+    draw.line([(arrow_x-8, arrow_y), (arrow_x, arrow_y+12), (arrow_x+8, arrow_y)], fill=(0, 0, 0), width=3)
+    
+    # X button - Cancel (red X, larger)
+    draw.text((132, 200), "X", font=st_fontS, fill=(255, 255, 255))
+    # Draw X
+    x_x, x_y = 150, 205
+    draw.line([(x_x-10, x_y-10), (x_x+10, x_y+10)], fill=(255, 0, 0), width=3)
+    draw.line([(x_x+10, x_y-10), (x_x-10, x_y+10)], fill=(255, 0, 0), width=3)
+    
+    # Y button - Select/OK (green checkmark, larger)
+    draw.text((192, 200), "Y", font=st_fontS, fill=(255, 255, 255))
+    # Draw checkmark
+    check_x, check_y = 210, 210
+    draw.line([(check_x-10, check_y), (check_x, check_y+10), (check_x+15, check_y-15)], 
+              fill=(0, 255, 0), width=3)
     
     display.display(image)
 
@@ -987,11 +1338,12 @@ def changeST7789ISO(display):
     # Update display with first file
     updateST7789Display_FileS(display, iterator, file_list)
     
-    # Button pins: 5 = Up, 6 = Down, 16 = Select, 24 = Cancel
-    select_button = 16
-    cancel_button = 24
-    up_button = 5
-    down_button = 6
+    # Pirate Audio button mapping
+    up_button = 5      # Button A
+    down_button = 6     # Button B
+    # FIXED: Swapped select and cancel buttons to match the new screen layout
+    cancel_button = 16  # Button X 
+    select_button = 24  # Button Y
     
     # Track button states
     last_states = {
@@ -1004,42 +1356,117 @@ def changeST7789ISO(display):
     while True:
         time.sleep(0.05)
         
-        # Check Up button
+        # Check Up button (A)
         current_up = GPIO.input(up_button)
         if current_up == 0 and last_states[up_button] == 1:  # Pressed
             last_states[up_button] = 0
         elif current_up == 1 and last_states[up_button] == 0:  # Released
             iterator = (iterator - 1) % len(file_list)
             updateST7789Display_FileS(display, iterator, file_list)
-            logger.info(f"Up button: selected {file_list[iterator]}")
+            logger.info(f"Button A (up): selected {file_list[iterator]}")
             last_states[up_button] = 1
         
-        # Check Down button
+        # Check Down button (B)
         current_down = GPIO.input(down_button)
         if current_down == 0 and last_states[down_button] == 1:  # Pressed
             last_states[down_button] = 0
         elif current_down == 1 and last_states[down_button] == 0:  # Released
             iterator = (iterator + 1) % len(file_list)
             updateST7789Display_FileS(display, iterator, file_list)
-            logger.info(f"Down button: selected {file_list[iterator]}")
+            logger.info(f"Button B (down): selected {file_list[iterator]}")
             last_states[down_button] = 1
         
-        # Check Select button
+        # FIXED: Swapped select and cancel button handling
+        # Check Select button (Y) 
         current_select = GPIO.input(select_button)
         if current_select == 0 and last_states[select_button] == 1:  # Pressed
             last_states[select_button] = 0
         elif current_select == 1 and last_states[select_button] == 0:  # Released
-            logger.info(f"Loading {store_mnt}/{file_list[iterator]}")
+            logger.info(f"Button Y (select): Loading {store_mnt}/{file_list[iterator]}")
             requests.request('GET', f'http://127.0.0.1/mount/{urllib.parse.quote_plus(file_list[iterator])}')
             return True
         
-        # Check Cancel button
+        # Check Cancel button (X)
         current_cancel = GPIO.input(cancel_button)
         if current_cancel == 0 and last_states[cancel_button] == 1:  # Pressed
             last_states[cancel_button] = 0
         elif current_cancel == 1 and last_states[cancel_button] == 0:  # Released
-            logger.info("Cancel button pressed")
+            logger.info("Button X (cancel): Returning to main screen")
             return False
+
+def handleST7789AdvancedMenu(display):
+    """Handle advanced menu navigation and selection on ST7789 display"""
+    import RPi.GPIO as GPIO
+    # Ensure GPIO mode is set
+    if not hasattr(GPIO, "gpio_function"):
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setwarnings(False)
+    
+    # Pirate Audio button mapping
+    up_button = 5      # Button A
+    down_button = 6     # Button B
+    cancel_button = 16  # Button X
+    select_button = 24  # Button Y
+    
+    # Track button states
+    last_states = {
+        up_button: 1,
+        down_button: 1,
+        cancel_button: 1,
+        select_button: 1
+    }
+    
+    selected_item = 0  # 0 = Mode Switch, 1 = Shutdown
+    max_items = 2
+    
+    # Initial menu display
+    updateST7789Display_Advanced(display, selected_item)
+    
+    while True:
+        time.sleep(0.05)
+        
+        # Check Up button (A)
+        current_up = GPIO.input(up_button)
+        if current_up == 0 and last_states[up_button] == 1:  # Pressed
+            last_states[up_button] = 0
+        elif current_up == 1 and last_states[up_button] == 0:  # Released
+            selected_item = (selected_item - 1) % max_items
+            updateST7789Display_Advanced(display, selected_item)
+            logger.info(f"Advanced menu: selected item {selected_item}")
+            last_states[up_button] = 1
+        
+        # Check Down button (B)
+        current_down = GPIO.input(down_button)
+        if current_down == 0 and last_states[down_button] == 1:  # Pressed
+            last_states[down_button] = 0
+        elif current_down == 1 and last_states[down_button] == 0:  # Released
+            selected_item = (selected_item + 1) % max_items
+            updateST7789Display_Advanced(display, selected_item)
+            logger.info(f"Advanced menu: selected item {selected_item}")
+            last_states[down_button] = 1
+        
+        # Check Cancel button (X)
+        current_cancel = GPIO.input(cancel_button)
+        if current_cancel == 0 and last_states[cancel_button] == 1:  # Pressed
+            last_states[cancel_button] = 0
+        elif current_cancel == 1 and last_states[cancel_button] == 0:  # Released
+            logger.info("Advanced menu: canceled")
+            return False
+        
+        # Check Select button (Y)
+        current_select = GPIO.input(select_button)
+        if current_select == 0 and last_states[select_button] == 1:  # Pressed
+            last_states[select_button] = 0
+        elif current_select == 1 and last_states[select_button] == 0:  # Released
+            if selected_item == 0:  # Mode switch
+                logger.info("Advanced menu: switching mode")
+                switch()
+                return True
+            elif selected_item == 1:  # Shutdown
+                logger.info("Advanced menu: shutting down")
+                requests.request('GET', 'http://127.0.0.1/shutdown')
+                return True
+            last_states[select_button] = 1
 
 def main():
     #Setup Environment
