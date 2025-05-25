@@ -135,7 +135,7 @@ allow_update_from_store = True
 gadgetCDFolder = '/sys/kernel/config/usb_gadget/usbode'
 iso_mount_file = '/opt/usbode/usbode-iso.txt'
 cdemu_cdrom = '/dev/cdrom'
-versionNum = "1.99"
+versionNum = "1.99a"
 global updateEvent
 updateEvent = 0
 global exitRequested
@@ -181,23 +181,58 @@ HTML_LAYOUT = """<!DOCTYPE html>
 <html>
 <head>
     <title>USBODE - USB Optical Drive Emulator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body {{background-color: #EAEAEA; color: #333333; font-family: "Times New Roman", serif; margin: 0; padding: 0;}}
+        /* Basic styling compatible with CSS 1.0 */
+        body {{background-color: #EAEAEA; color: #333333; font-family: serif; margin: 0; padding: 0;}}
         h1, h2, h3 {{color: #1E4D8C;}}
         a {{color: #0066CC;}}
         a:visited {{color: #0066CC;}}
-        .container {{width: 100%; margin: 0; padding: 0;}}
+        
+        /* Container with percentage-based width for better scaling */
+        .container {{width: 100%; max-width: 800px; margin: 0 auto; padding: 0;}}
+        
+        /* Header and footer styling */
         .header {{background-color: #3A7CA5; padding: 10px; text-align: center; color: #FFFFFF;}}
         .header h1, .header h2 {{color: #FFFFFF; margin: 5px 0;}}
         .content {{padding: 10px; background-color: #FFFFFF; min-height: 300px;}}
         .footer {{background-color: #3A7CA5; padding: 10px; text-align: center; color: #FFFFFF;}}
-        .button {{background-color: #4CAF50; padding: 7px 15px; text-decoration: none; color: #FFFFFF; margin: 5px; display: inline-block;}}
+        
+        /* Button styling that works on small screens */
+        .button {{
+            background-color: #4CAF50; 
+            padding: 7px 15px; 
+            text-decoration: none; 
+            color: #FFFFFF; 
+            margin: 5px; 
+            display: inline-block;
+            border: 1px solid #2E8B57;
+        }}
+        
+        /* Info boxes with better padding on small screens */
         .info-box {{background-color: #F5F5F5; padding: 10px; margin: 10px 0;}}
         .warning {{background-color: #FFDDDD; padding: 10px; margin: 10px 0; color: #990000;}}
-        .file-link {{padding: 8px; margin: 5px 0; display: block; font-size: 16px;}}
+        
+        /* File list items with better scaling */
+        .file-link {{
+            padding: 8px; 
+            margin: 5px 0; 
+            display: block; 
+            font-size: 16px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }}
         .file-link-even {{background-color: #E3F2FD;}}
         .file-link-odd {{background-color: #BBDEFB;}}
-        .header-bar {{background-color: #2C5F7C; color: #FFFFFF; padding: 5px;}}
+        
+        /* Simple media queries for basic responsive layout - ignored by old browsers */
+        @media screen and (max-width: 480px) {{
+            .button {{
+                display: block;
+                margin: 10px 0;
+                text-align: center;
+            }}
+        }}
     </style>
 </head>
 <body>
@@ -1353,18 +1388,18 @@ def updateST7789Display_FileS(display, iterator, file_list):
     # Calculate how many lines we need and adjust the blue box height accordingly
     if len(selected_file) <= chars_per_line:
         # Single line display - smaller box
-        draw.rectangle([(0, 70), (240, 115)], fill=(187, 222, 251))
+        draw.rectangle([(0, 70), (240, 115)], fill=(187, 222, 251), outline=(58, 124, 165), width=2)
         draw.text((10, 85), selected_file, font=st_fontL, fill=(0, 0, 0))
     elif len(selected_file) <= chars_per_line * 2:
         # Two line display - medium box
-        draw.rectangle([(0, 70), (240, 130)], fill=(187, 222, 251))
+        draw.rectangle([(0, 70), (240, 130)], fill=(187, 222, 251), outline=(58, 124, 165), width=2)
         line1 = selected_file[:chars_per_line]
         line2 = selected_file[chars_per_line:]
         draw.text((10, 80), line1, font=st_fontL, fill=(0, 0, 0))
         draw.text((10, 105), line2, font=st_fontL, fill=(0, 0, 0))
     else:
         # Three line display - taller box
-        draw.rectangle([(0, 70), (240, 150)], fill=(187, 222, 251))
+        draw.rectangle([(0, 70), (240, 150)], fill=(187, 222, 251), outline=(58, 124, 165), width=2)
         line1 = selected_file[:chars_per_line]
         line2 = selected_file[chars_per_line:chars_per_line*2]
         
