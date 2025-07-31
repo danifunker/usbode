@@ -29,7 +29,7 @@ Note: It may not work with some forms of CD-ROM copy protection. Also, there is 
 7. You should now be able to access the USBODE browser interface by entering its IP address (or the Hostname if you defined that earlier) in a web-browser. If your router automatically assigns IP addresses via DHCP, log into your router’s web interface to see the IP assigned to your Pi Zero device. See the section below on navigating the USBODE browser interface.
    - If you see "The connection has timed out", it is likely still booting. If you see a 500 error, this is usually resolved by rebooting the Pi.
 
-The setup should now be complete. If you have any difficulties, help is available on [Discord](https://discord.gg/na2qNrvdFY).
+The setup should now be complete. If you have any difficulties, help is available on [Discord](https://discord.gg/8qfuuUPBts).
 
 ## Using USBODE on the target computer
 1. Shut down the target computer.
