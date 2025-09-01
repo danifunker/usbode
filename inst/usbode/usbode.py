@@ -1166,7 +1166,7 @@ def init_st7789():
         
         # Log all ST7789 settings for troubleshooting
         log_st7789_settings(display)
-        
+
         return display
     except Exception as e:
         logger.error(f"Failed to initialize ST7789 display: {e}")
@@ -1176,22 +1176,28 @@ def init_st7789():
 
 # Example: Log all ST7789 settings
 def log_st7789_settings(disp):
-    settings = {
-        "port": disp._spi.fd,  # file descriptor, not port number, but shows SPI is open
-        "cs": disp._spi.cshigh,
-        "dc": disp._dc,
-        "backlight": getattr(disp, "_bl", None),
-        "rst": getattr(disp, "_rst", None),
-        "width": disp._width,
-        "height": disp._height,
-        "rotation": disp._rotation,
-        "invert": disp._invert,
-        "spi_speed_hz": disp._spi.max_speed_hz,
-        "offset_left": disp._offset_left,
-        "offset_top": disp._offset_top,
-    }
-    for k, v in settings.items():
-        print(f"{k}: {v}")
+    logger.info(f"ST7789 display object type: {type(disp)}")
+    logger.info(f"ST7789 display object dir: {dir(disp)}")
+    logger.info(f"ST7789 display object repr: {repr(disp)}")
+    # Log all attributes and their values
+    for attr in dir(disp):
+        if not attr.startswith("__"):
+            try:
+                logger.info(f"{attr}: {getattr(disp, attr)}")
+            except Exception as e:
+                logger.info(f"{attr}: <error: {e}>")
+    # If _spi exists, log its attributes too
+    if hasattr(disp, "_spi"):
+        spi_obj = disp._spi
+        logger.info(f"_spi object type: {type(spi_obj)}")
+        logger.info(f"_spi object dir: {dir(spi_obj)}")
+        logger.info(f"_spi object repr: {repr(spi_obj)}")
+        for attr in dir(spi_obj):
+            if not attr.startswith("__"):
+                try:
+                    logger.info(f"_spi.{attr}: {getattr(spi_obj, attr)}")
+                except Exception as e:
+                    logger.info(f"_spi.{attr}: <error: {e}>")
 
 # Add these new functions to provide a consistent interface
 
