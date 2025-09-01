@@ -1134,7 +1134,7 @@ def init_st7789():
         # Initialize display
         logger.info("Beginning display initialization sequence")
         display.begin()
-        time.sleep(0.1)  # Brief pause after initialization
+        time.sleep(0.1)
         
         # Test the display with a sequence of colors
         logger.info("Testing display with color sequence")
@@ -1163,13 +1163,35 @@ def init_st7789():
         logger.info("Displayed white test pattern")
         
         logger.info("ST7789 display initialization complete")
-        return display
         
+        # Log all ST7789 settings for troubleshooting
+        log_st7789_settings(display)
+        
+        return display
     except Exception as e:
         logger.error(f"Failed to initialize ST7789 display: {e}")
         import traceback
         logger.error(traceback.format_exc())
         return None
+
+# Example: Log all ST7789 settings
+def log_st7789_settings(disp):
+    settings = {
+        "port": disp._spi.fd,  # file descriptor, not port number, but shows SPI is open
+        "cs": disp._spi.cshigh,
+        "dc": disp._dc,
+        "backlight": getattr(disp, "_bl", None),
+        "rst": getattr(disp, "_rst", None),
+        "width": disp._width,
+        "height": disp._height,
+        "rotation": disp._rotation,
+        "invert": disp._invert,
+        "spi_speed_hz": disp._spi.max_speed_hz,
+        "offset_left": disp._offset_left,
+        "offset_top": disp._offset_top,
+    }
+    for k, v in settings.items():
+        print(f"{k}: {v}")
 
 # Add these new functions to provide a consistent interface
 
@@ -1512,6 +1534,7 @@ def updateST7789Display_Advanced(display, selected_item=0):
     draw.line([(arrow_x-8, arrow_y), (arrow_x, arrow_y+12), (arrow_x+8, arrow_y)], fill=(0, 0, 0), width=3)
     
     # X button - Cancel (red X, larger)
+
     draw.text((132, 200), "X", font=st_fontS, fill=(255, 255, 255))
     # Draw X
     x_x, x_y = 150, 205
