@@ -1,3 +1,17 @@
+# UPDATE THIS REPOSITORY LONGER HAS THE LATEST VERSION #
+Please visit [https://github.com/danifunker/usbode-circle](https://github.com/danifunker/usbode-circle) for the latest repo
+
+
+
+
+
+
+
+
+
+
+
+
 # USBODE: the USB Optical Drive Emulator
 USBODE uses a Raspberry Pi Zero to emulate optical drives on retro computers equipped with USB. It appears to your computer as a standard CD drive, and you can load up .ISO files stored on the Pi's MicroSD card. It can be easily configured over a web interface, and it can also take advantage of the Waveshare OLED hat.
 
