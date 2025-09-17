@@ -1,4 +1,4 @@
-# UPDATE THIS REPOSITORY LONGER HAS THE LATEST VERSION #
+# UPDATE THIS REPOSITORY NO LONGER HAS THE LATEST VERSION #
 Please visit [https://github.com/danifunker/usbode-circle](https://github.com/danifunker/usbode-circle) for the latest repo
 
 
